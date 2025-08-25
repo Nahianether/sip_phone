@@ -5,6 +5,7 @@ import 'screens/home_screen.dart';
 import 'screens/active_call_screen.dart';
 import 'screens/incoming_call_screen.dart';
 import 'services/navigation_service.dart';
+import 'services/websocket_service.dart';
 
 void main() {
   runApp(const SipPhoneApp());
@@ -57,6 +58,25 @@ class _PermissionWrapperState extends State<PermissionWrapper> {
       Permission.microphone,
       Permission.camera,
     ].request();
+    
+    WebSocketService.setMessageHandler((String message) {
+      print('Received WebSocket message: $message');
+    });
+    
+    WebSocketService.setConnectionStatusHandler((bool isConnected) {
+      print('WebSocket connection status changed: $isConnected');
+    });
+    
+    // SIP configuration as your server expects
+    final sipConfig = SipConfig(
+      wsUrl: 'wss://sip.ibos.io:8089/ws',
+      server: '564612@sip.ibos.io',
+      username: '564612',
+      password: 'iBOS123',
+      displayName: 'Remon',
+    );
+    
+    await WebSocketService.connectWithSipConfig(sipConfig);
   }
 
   @override

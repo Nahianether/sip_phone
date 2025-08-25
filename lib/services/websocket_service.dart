@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class SipConfig {
@@ -6,7 +7,7 @@ class SipConfig {
   final String username;
   final String password;
   final String displayName;
-  
+
   const SipConfig({
     required this.wsUrl,
     required this.server,
@@ -14,7 +15,7 @@ class SipConfig {
     required this.password,
     required this.displayName,
   });
-  
+
   WebSocketConfig toWebSocketConfig() {
     final uri = Uri.parse(wsUrl);
     return WebSocketConfig(
@@ -40,7 +41,7 @@ class WebSocketConfig {
   final bool useSSL;
   final Map<String, String> queryParams;
   final Map<String, String> headers;
-  
+
   const WebSocketConfig({
     required this.host,
     required this.port,
@@ -49,7 +50,7 @@ class WebSocketConfig {
     this.queryParams = const {},
     this.headers = const {},
   });
-  
+
   Map<String, dynamic> toMap() {
     return {
       'host': host,
@@ -60,21 +61,21 @@ class WebSocketConfig {
       'headers': headers,
     };
   }
-  
+
   String get url {
     final protocol = useSSL ? 'wss' : 'ws';
     final portStr = (port != 80 && port != 443) ? ':$port' : '';
     final pathStr = path ?? '/ws';
-    
+
     var url = '$protocol://$host$portStr$pathStr';
-    
+
     if (queryParams.isNotEmpty) {
       final params = queryParams.entries
           .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
           .join('&');
       url += '?$params';
     }
-    
+
     return url;
   }
 }
@@ -83,25 +84,25 @@ class WebSocketService {
   static const MethodChannel _channel = MethodChannel('websocket_service');
   static Function(String)? _messageHandler;
   static Function(bool)? _connectionStatusHandler;
-  
+
   static Future<bool> connectWithConfig(WebSocketConfig config) async {
     try {
       _setupMethodCallHandler();
       final bool result = await _channel.invokeMethod('connectWebSocketWithConfig', config.toMap());
       return result;
     } on PlatformException catch (e) {
-      print('Failed to connect WebSocket: ${e.message}');
+      debugPrint('Failed to connect WebSocket: ${e.message}');
       return false;
     }
   }
-  
+
   static Future<bool> connectWithSipConfig(SipConfig sipConfig) async {
     return connectWithConfig(sipConfig.toWebSocketConfig());
   }
-  
+
   static Future<bool> connectWebSocket({
     required String host,
-    required int port, 
+    required int port,
     required String apiKey,
     required String empId,
     required String empName,
@@ -116,64 +117,60 @@ class WebSocketService {
       'dep_id': depId,
       'acc_id': accId,
     };
-    
+
     if (additionalParams != null) {
       queryParams.addAll(additionalParams);
     }
-    
+
     final config = WebSocketConfig(
       host: host,
       port: port,
       queryParams: queryParams,
       useSSL: port == 443 || port == 8089 || port == 8443,
     );
-    
+
     return connectWithConfig(config);
   }
-  
+
   static Future<bool> connectWebSocketWithUrl(String url) async {
     try {
       _setupMethodCallHandler();
-      final bool result = await _channel.invokeMethod('connectWebSocketWithUrl', {
-        'url': url,
-      });
+      final bool result = await _channel.invokeMethod('connectWebSocketWithUrl', {'url': url});
       return result;
     } on PlatformException catch (e) {
-      print('Failed to connect WebSocket: ${e.message}');
+      debugPrint('Failed to connect WebSocket: ${e.message}');
       return false;
     }
   }
-  
+
   static Future<bool> disconnectWebSocket() async {
     try {
       final bool result = await _channel.invokeMethod('disconnectWebSocket');
       return result;
     } on PlatformException catch (e) {
-      print('Failed to disconnect WebSocket: ${e.message}');
+      debugPrint('Failed to disconnect WebSocket: ${e.message}');
       return false;
     }
   }
-  
+
   static Future<bool> sendMessage(String message) async {
     try {
-      final bool result = await _channel.invokeMethod('sendMessage', {
-        'message': message,
-      });
+      final bool result = await _channel.invokeMethod('sendMessage', {'message': message});
       return result;
     } on PlatformException catch (e) {
-      print('Failed to send message: ${e.message}');
+      debugPrint('Failed to send message: ${e.message}');
       return false;
     }
   }
-  
+
   static void setMessageHandler(Function(String) onMessage) {
     _messageHandler = onMessage;
   }
-  
+
   static void setConnectionStatusHandler(Function(bool) onStatusChanged) {
     _connectionStatusHandler = onStatusChanged;
   }
-  
+
   static void _setupMethodCallHandler() {
     _channel.setMethodCallHandler((MethodCall call) async {
       switch (call.method) {

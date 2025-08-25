@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sip_ua/sip_ua.dart';
 import '../services/sip_service.dart';
-import 'active_call_screen.dart';
 
 class IncomingCallScreen extends StatefulWidget {
   final Call call;
@@ -42,13 +41,11 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   void _acceptCall() {
+    print('🔥 DEBUG: User tapped accept button');
     _sipService.answer(widget.call);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ActiveCallScreen(call: widget.call),
-      ),
-    );
+    print('🔥 DEBUG: Called _sipService.answer(), waiting for call state changes...');
+    // Don't navigate immediately - let the SIP service handle navigation
+    // when the call reaches CONFIRMED state
   }
 
   void _declineCall() {

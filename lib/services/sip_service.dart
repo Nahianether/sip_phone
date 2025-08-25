@@ -269,14 +269,21 @@ class SipService extends SipUaHelperListener {
 
   void answer(Call call) {
     try {
+      print('🔥 DEBUG: Attempting to answer call - Call ID: ${call.id}');
+      
+      // Simple answer call with minimal options
       final answerOptions = {
-        'mediaConstraints': {'audio': true, 'video': false},
-        'rtcAnswerConstraints': {'offerToReceiveAudio': true, 'offerToReceiveVideo': false},
+        'mediaConstraints': {
+          'audio': true,
+          'video': false,
+        },
       };
-
+      
       call.answer(answerOptions);
       _reconnectStatusController.add('Call answered');
+      print('🔥 DEBUG: Call.answer() method called successfully');
     } catch (e) {
+      print('🔥 DEBUG: Error in answer() method: $e');
       _reconnectStatusController.add('Error answering call: $e');
     }
   }
@@ -372,13 +379,8 @@ class SipService extends SipUaHelperListener {
         break;
       case CallStateEnum.CONNECTING:
         statusMessage = 'Connecting call to ${call.remote_identity}';
-        // Also check for incoming calls in connecting state
-        if (call.direction?.toLowerCase() == 'incoming' && _navigationService.currentContext != null) {
-          final currentRoute = ModalRoute.of(_navigationService.currentContext!)?.settings.name;
-          if (currentRoute != '/incoming_call') {
-            _handleIncomingCall(call);
-          }
-        }
+        // Don't trigger additional navigation for incoming calls in CONNECTING state
+        // The initial CALL_INITIATION should have already handled this
         break;
       case CallStateEnum.PROGRESS:
         statusMessage = 'Call in progress to ${call.remote_identity}';
@@ -392,8 +394,15 @@ class SipService extends SipUaHelperListener {
         Future.delayed(Duration(milliseconds: 100), () {
           final context = NavigationService.navigatorKey.currentContext;
           if (context != null) {
-            Navigator.pushNamed(context, '/active_call', arguments: call);
-            print('🔥 DEBUG: CONFIRMED direct navigation successful');
+            // For incoming calls, replace the incoming call screen with active call screen
+            // For outgoing calls, navigate normally (might already be on active call screen)
+            if (call.direction?.toLowerCase() == 'incoming') {
+              Navigator.pushReplacementNamed(context, '/active_call', arguments: call);
+              print('🔥 DEBUG: CONFIRMED incoming call - replaced with active call screen');
+            } else {
+              Navigator.pushNamed(context, '/active_call', arguments: call);
+              print('🔥 DEBUG: CONFIRMED outgoing call - navigated to active call screen');
+            }
           } else {
             print('🔥 DEBUG: CONFIRMED - No context available for navigation');
           }
@@ -408,6 +417,10 @@ class SipService extends SipUaHelperListener {
         break;
       case CallStateEnum.FAILED:
         statusMessage = 'Call failed to ${call.remote_identity}';
+        // Navigate back to home when call fails
+        Future.delayed(Duration(milliseconds: 500), () {
+          _navigationService.navigateToAndClearStack('/home');
+        });
         break;
       case CallStateEnum.MUTED:
         statusMessage = 'Call muted';

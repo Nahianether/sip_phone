@@ -241,16 +241,19 @@ class _DialerScreenState extends State<DialerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 FloatingActionButton(
+                  heroTag: "backspace_btn",
                   onPressed: _phoneNumber.isNotEmpty ? _removeDigit : null,
                   backgroundColor: Colors.grey.shade300,
                   child: const Icon(Icons.backspace, color: Colors.black),
                 ),
                 FloatingActionButton(
+                  heroTag: "call_btn",
                   onPressed: _phoneNumber.isNotEmpty && _sipService.connected ? _makeCall : null,
                   backgroundColor: Colors.green,
                   child: const Icon(Icons.call, color: Colors.white),
                 ),
                 FloatingActionButton(
+                  heroTag: "clear_btn",
                   onPressed: _phoneNumber.isNotEmpty ? _clearNumber : null,
                   backgroundColor: Colors.red.shade300,
                   child: const Icon(Icons.clear, color: Colors.white),

@@ -5,6 +5,7 @@ import '../services/call_manager.dart';
 import 'dialer_screen.dart';
 import 'settings_screen.dart';
 import 'active_call_screen.dart';
+import 'websocket_test_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -148,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: [
           const DialerScreen(),
-          const Center(child: Text('Call History')),
+          const WebSocketTestScreen(),
           const SettingsScreen(),
         ],
       ),
@@ -161,8 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Dialer',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'History',
+            icon: Icon(Icons.wifi),
+            label: 'WebSocket',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

@@ -91,8 +91,8 @@ class WebSocketService : Service() {
     
     private fun startForegroundService() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("WebSocket Service")
-            .setContentText("Maintaining WebSocket connection")
+            .setContentTitle("SIP WebSocket Service")
+            .setContentText("Maintaining SIP WebSocket connection")
             .setSmallIcon(R.mipmap.ic_launcher)
             .build()
             
@@ -131,7 +131,16 @@ class WebSocketService : Service() {
         }
         
         val url = urlBuilder.toString()
-        Log.d(TAG, "Connecting to WebSocket with config: $url")
+        Log.d(TAG, "Connecting to SIP WebSocket: $url")
+        
+        // Log SIP headers being sent
+        headers?.let { sipHeaders ->
+            Log.d(TAG, "SIP Configuration:")
+            sipHeaders.forEach { (key, value) ->
+                Log.d(TAG, "  $key = $value")
+            }
+        }
+        
         connectWebSocket(url, headers)
     }
     
@@ -178,47 +187,50 @@ class WebSocketService : Service() {
         
         val requestBuilder = Request.Builder().url(url)
         
-        // Add custom headers if provided
+        // Add SIP headers if provided - this is crucial for SIP server expectations
         headers?.forEach { (key, value) ->
-            Log.d(TAG, "Adding header: $key = $value")
+            Log.d(TAG, "Adding SIP header: $key = $value")
             requestBuilder.addHeader(key, value)
         }
         
         if (headers?.isNotEmpty() == true) {
-            Log.d(TAG, "Total headers added: ${headers.size}")
+            Log.d(TAG, "Total SIP headers added: ${headers.size}")
         }
         
         val request = requestBuilder.build()
         
         val webSocketListener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "WebSocket connection opened to: $url")
+                Log.d(TAG, "SIP WebSocket connection opened to: $url")
+                Log.d(TAG, "Connection response headers: ${response.headers}")
                 broadcastConnectionStatus(true)
             }
             
             override fun onMessage(webSocket: WebSocket, text: String) {
-                Log.d(TAG, "Received message: $text")
+                Log.d(TAG, "Received SIP message: $text")
                 broadcastMessage(text)
             }
             
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                Log.d(TAG, "Received bytes: ${bytes.hex()}")
+                Log.d(TAG, "Received SIP bytes: ${bytes.hex()}")
                 broadcastMessage(bytes.hex())
             }
             
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "WebSocket closing: $code $reason")
+                Log.d(TAG, "SIP WebSocket closing: $code $reason")
                 webSocket.close(1000, null)
                 broadcastConnectionStatus(false)
             }
             
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket error connecting to $url: ${t.message}")
+                Log.e(TAG, "SIP WebSocket error connecting to $url: ${t.message}")
+                Log.e(TAG, "Response: ${response?.toString()}")
                 broadcastConnectionStatus(false)
                 
                 // Attempt to reconnect after a delay
                 android.os.Handler(mainLooper).postDelayed({
-                    connectWebSocket(url)
+                    Log.d(TAG, "Attempting SIP WebSocket reconnection...")
+                    connectWebSocket(url, headers)
                 }, 5000)
             }
         }
@@ -233,7 +245,7 @@ class WebSocketService : Service() {
     }
     
     private fun sendMessage(message: String) {
-        webSocket?.send(message) ?: Log.w(TAG, "WebSocket not connected, cannot send message")
+        webSocket?.send(message) ?: Log.w(TAG, "SIP WebSocket not connected, cannot send message")
     }
     
     private fun broadcastMessage(message: String) {

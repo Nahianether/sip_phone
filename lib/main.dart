@@ -77,29 +77,6 @@ class _PermissionWrapperState extends State<PermissionWrapper> {
     );
     
     await WebSocketService.connectWithSipConfig(sipConfig);
-    
-    // Example 2: Or use the legacy method (still supported)
-    /*
-    await WebSocketService.connectWebSocket(
-      host: 'track-api.ibos.io', 
-      port: 443,
-      apiKey: 'iBOS123',
-      empId: '564612',
-      empName: 'Remon', 
-      depId: 'sip.ibos.io',
-      accId: '564612',
-      additionalParams: {
-        'custom_param': 'value',
-      },
-    );
-    */
-    
-    // Example 3: Or connect directly with URL
-    /*
-    await WebSocketService.connectWebSocketWithUrl(
-      'wss://track-api.ibos.io/ws?api_key=iBOS123&emp_id=564612&emp_name=Remon'
-    );
-    */
   }
 
   @override

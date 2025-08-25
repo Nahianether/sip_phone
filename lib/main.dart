@@ -108,20 +108,12 @@ class _PermissionWrapperState extends State<PermissionWrapper> {
   }
 }
 
+ 
 
-// Future<void> _saveCredentials(
-//     String username,
-//     String password,
-//     String server,
-//     String wsUrl,
-//     String? displayName,
-//   ) async {
-//     final prefs = await SharedPreferences.getInstance();
-//     await prefs.setString('sip_username', username);
-//     await prefs.setString('sip_password', password);
-//     await prefs.setString('sip_server', server);
-//     await prefs.setString('sip_ws_url', wsUrl);
-//     if (displayName != null) {
-//       await prefs.setString('sip_display_name', displayName);
-//     }
-//   }
+/*
+sip_ws_url =  wss://sip.ibos.io:8089/ws
+sip_server = 564612@sip.ibos.io
+sip_username = 564612
+sip_password = iBOS123
+sip_display_name = "Remon"
+*/

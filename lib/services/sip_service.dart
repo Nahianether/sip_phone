@@ -229,7 +229,7 @@ class SipService extends SipUaHelperListener {
     }
 
     try {
-      print('🔥 DEBUG: makeCall called - target: $target, connected: $_connected');
+      debugPrint('🔥 DEBUG: makeCall called - target: $target, connected: $_connected');
       _reconnectStatusController.add('Initiating call to $target...');
 
       // Enhanced call options for better compatibility
@@ -269,7 +269,7 @@ class SipService extends SipUaHelperListener {
 
   void answer(Call call) {
     try {
-      print('🔥 DEBUG: Attempting to answer call - Call ID: ${call.id}');
+      debugPrint('🔥 DEBUG: Attempting to answer call - Call ID: ${call.id}');
       
       // Simple answer call with minimal options
       final answerOptions = {
@@ -281,9 +281,9 @@ class SipService extends SipUaHelperListener {
       
       call.answer(answerOptions);
       _reconnectStatusController.add('Call answered');
-      print('🔥 DEBUG: Call.answer() method called successfully');
+      debugPrint('🔥 DEBUG: Call.answer() method called successfully');
     } catch (e) {
-      print('🔥 DEBUG: Error in answer() method: $e');
+      debugPrint('🔥 DEBUG: Error in answer() method: $e');
       _reconnectStatusController.add('Error answering call: $e');
     }
   }
@@ -330,7 +330,7 @@ class SipService extends SipUaHelperListener {
 
   @override
   void registrationStateChanged(RegistrationState state) {
-    print('🔥 DEBUG: registrationStateChanged called - State: ${state.state}');
+    debugPrint('🔥 DEBUG: registrationStateChanged called - State: ${state.state}');
     _registrationState = state;
     final wasConnected = _connected;
     _connected = state.state == RegistrationStateEnum.REGISTERED;
@@ -352,7 +352,7 @@ class SipService extends SipUaHelperListener {
 
   @override
   void callStateChanged(Call call, CallState callState) {
-    print('🔥 DEBUG: callStateChanged called - State: ${callState.state}, Direction: ${call.direction}');
+    debugPrint('🔥 DEBUG: callStateChanged called - State: ${callState.state}, Direction: ${call.direction}');
     _callStateController.add(call);
 
     // Add detailed call state logging
@@ -367,9 +367,9 @@ class SipService extends SipUaHelperListener {
             final context = NavigationService.navigatorKey.currentContext;
             if (context != null) {
               Navigator.pushNamed(context, '/active_call', arguments: call);
-              print('🔥 DEBUG: Direct navigation to /active_call successful');
+              debugPrint('🔥 DEBUG: Direct navigation to /active_call successful');
             } else {
-              print('🔥 DEBUG: No context available for navigation');
+              debugPrint('🔥 DEBUG: No context available for navigation');
             }
           });
         } else if (call.direction.toLowerCase() == 'incoming') {
@@ -398,13 +398,13 @@ class SipService extends SipUaHelperListener {
             // For outgoing calls, navigate normally (might already be on active call screen)
             if (call.direction?.toLowerCase() == 'incoming') {
               Navigator.pushReplacementNamed(context, '/active_call', arguments: call);
-              print('🔥 DEBUG: CONFIRMED incoming call - replaced with active call screen');
+              debugPrint('🔥 DEBUG: CONFIRMED incoming call - replaced with active call screen');
             } else {
               Navigator.pushNamed(context, '/active_call', arguments: call);
-              print('🔥 DEBUG: CONFIRMED outgoing call - navigated to active call screen');
+              debugPrint('🔥 DEBUG: CONFIRMED outgoing call - navigated to active call screen');
             }
           } else {
-            print('🔥 DEBUG: CONFIRMED - No context available for navigation');
+            debugPrint('🔥 DEBUG: CONFIRMED - No context available for navigation');
           }
         });
         break;
@@ -445,7 +445,7 @@ class SipService extends SipUaHelperListener {
     }
 
     _reconnectStatusController.add(statusMessage);
-    print('SIP: $statusMessage - Direction: ${call.direction}'); // Debug print
+    debugPrint('SIP: $statusMessage - Direction: ${call.direction}');
   }
 
   @override
@@ -457,15 +457,15 @@ class SipService extends SipUaHelperListener {
   void _handleIncomingCall(Call call) {
     _callStateController.add(call);
     _reconnectStatusController.add('Incoming call from ${call.remote_identity}');
-    print('SIP: Incoming call from ${call.remote_identity}'); // Debug print
+    debugPrint('SIP: Incoming call from ${call.remote_identity}');
 
     Future.delayed(Duration(milliseconds: 100), () {
       final context = NavigationService.navigatorKey.currentContext;
       if (context != null) {
         Navigator.pushNamed(context, '/incoming_call', arguments: call);
-        print('🔥 DEBUG: Incoming call navigation successful');
+        debugPrint('🔥 DEBUG: Incoming call navigation successful');
       } else {
-        print('🔥 DEBUG: Incoming call - No context available for navigation');
+        debugPrint('🔥 DEBUG: Incoming call - No context available for navigation');
       }
     });
   }

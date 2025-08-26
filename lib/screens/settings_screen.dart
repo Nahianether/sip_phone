@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_ua/sip_ua.dart';
@@ -19,6 +20,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _authUserController = TextEditingController();
   final _passwordController = TextEditingController();
   final _displayNameController = TextEditingController();
+  
+  bool _isPasswordVisible = false;
 
   @override
   void initState() {
@@ -49,8 +52,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _connect() async {
     if (!_formKey.currentState!.validate()) return;
 
-    ref.read(isConnectingProvider.notifier).state = true;
-
     final sipUri = _sipUriController.text;
     final username = _authUserController.text;
     String server = '';
@@ -61,6 +62,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     try {
       final sipService = ref.read(sipServiceProvider);
+      
       final success = await sipService.connect(
         username: username,
         password: _passwordController.text,
@@ -71,20 +73,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             : null,
       );
 
-      ref.read(isConnectingProvider.notifier).state = false;
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Connecting to SIP server...' : 'Connection failed - please check your settings'),
+            content: Text(success ? 'Attempting to register...' : 'Connection failed - please check your settings'),
             backgroundColor: success ? Colors.green : Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
-      ref.read(isConnectingProvider.notifier).state = false;
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -112,9 +110,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final connectionType = ref.watch(connectionTypeProvider);
-    final autoReconnectEnabled = ref.watch(autoReconnectEnabledProvider);
-    final isConnecting = ref.watch(isConnectingProvider);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -127,35 +122,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const Text(
               'Account Settings',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            
-            // Connection Type
-            const Text(
-              'Connection Type',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Radio<String>(
-                  value: 'TCP',
-                  groupValue: connectionType,
-                  onChanged: (value) {
-                    ref.read(connectionTypeProvider.notifier).state = value!;
-                  },
-                ),
-                const Text('TCP'),
-                const SizedBox(width: 40),
-                Radio<String>(
-                  value: 'WebSocket',
-                  groupValue: connectionType,
-                  onChanged: (value) {
-                    ref.read(connectionTypeProvider.notifier).state = value!;
-                  },
-                ),
-                const Text('WebSocket'),
-              ],
             ),
             const SizedBox(height: 20),
             
@@ -178,21 +144,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () {
-                  // TODO: Implement test connection
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Test connection feature coming soon')),
-                  );
-                },
-                icon: const Icon(Icons.network_check),
-                label: const Text('Test Connection'),
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             
             // SIP URI
             TextFormField(
@@ -241,14 +193,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.lock),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.visibility),
+                  icon: Icon(
+                    _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  ),
                   onPressed: () {
-                    // TODO: Toggle password visibility
+                    setState(() {
+                      _isPasswordVisible = !_isPasswordVisible;
+                    });
                   },
                 ),
-                hintText: 'iBOS123',
+                hintText: 'Enter your SIP password',
               ),
-              obscureText: true,
+              obscureText: !_isPasswordVisible,
               validator: (value) {
                 if (value?.isEmpty ?? true) {
                   return 'Please enter password';
@@ -268,104 +224,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 hintText: '564613',
               ),
             ),
-            const SizedBox(height: 20),
-            
-            // Auto Reconnect Toggle
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Auto Reconnect', style: TextStyle(fontSize: 16)),
-                Switch(
-                  value: autoReconnectEnabled,
-                  onChanged: (value) {
-                    ref.read(autoReconnectEnabledProvider.notifier).state = value;
-                    final sipService = ref.read(sipServiceProvider);
-                    sipService.enableAutoReconnect(value);
-                  },
-                ),
-              ],
-            ),
             const SizedBox(height: 30),
             
             // Connection Status and Buttons
             Consumer(
               builder: (context, ref, child) {
                 final registrationState = ref.watch(registrationStateProvider);
-                final reconnectStatus = ref.watch(reconnectStatusProvider);
-                final sipService = ref.watch(sipServiceProvider);
                 
-                return registrationState.when(
-                  data: (state) {
-                    final isConnected = state.state == RegistrationStateEnum.REGISTERED;
-                    
-                    return Column(
-                      children: [
-                        // Reconnection Status
-                        reconnectStatus.when(
-                          data: (status) {
-                            if (sipService.isReconnecting) {
-                              return Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade100,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.orange),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(child: Text(status)),
-                                  ],
-                                ),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                          loading: () => const SizedBox.shrink(),
-                          error: (error, stack) => const SizedBox.shrink(),
+                // Always show the UI - don't wait for registration state loading
+                final state = registrationState.valueOrNull;
+                final isConnected = state?.state == RegistrationStateEnum.REGISTERED;
+                
+                return Column(
+                  children: [
+                    // Connection Status Display
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: isConnected 
+                            ? Colors.green.shade100
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isConnected ? Colors.green : Colors.grey,
                         ),
-                        
-                        // Connect/Disconnect Button
-                        if (!isConnected)
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: isConnecting ? null : _connect,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isConnected ? Icons.check_circle : Icons.radio_button_unchecked,
+                            color: isConnected ? Colors.green[600] : Colors.grey[600],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              isConnected ? 'Connected to SIP server' : 'Not connected',
+                              style: TextStyle(
+                                color: isConnected ? Colors.green[700] : Colors.grey[700],
+                                fontWeight: FontWeight.w500,
                               ),
-                              child: isConnecting
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text('Register', style: TextStyle(fontSize: 16)),
-                            ),
-                          )
-                        else
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _disconnect,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                              ),
-                              child: const Text('Disconnect', style: TextStyle(fontSize: 16)),
                             ),
                           ),
-                      ],
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (error, stack) => Center(child: Text('Error: $error')),
+                        ],
+                      ),
+                    ),
+                    
+                    // Register/Disconnect Button - No Loading State At All
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isConnected ? _disconnect : _connect,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isConnected ? Colors.red : Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: Text(
+                          isConnected ? 'Disconnect' : 'Register',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),

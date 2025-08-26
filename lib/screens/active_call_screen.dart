@@ -22,45 +22,12 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _listenToCallStates();
-    });
   }
 
   @override
   void dispose() {
     _callTimer?.cancel();
     super.dispose();
-  }
-
-  void _listenToCallStates() {
-    ref.listen<AsyncValue<Call>>(callStateProvider, (previous, next) {
-      next.whenData((call) {
-        if (call.id == widget.call.id) {
-          switch (call.state) {
-            case CallStateEnum.CONNECTING:
-              ref.read(callStatusProvider.notifier).state = 'Connecting...';
-              break;
-            case CallStateEnum.PROGRESS:
-              ref.read(callStatusProvider.notifier).state = 'Ringing...';
-              break;
-            case CallStateEnum.ACCEPTED:
-              ref.read(callStatusProvider.notifier).state = 'Call accepted';
-              break;
-            case CallStateEnum.CONFIRMED:
-              ref.read(callStatusProvider.notifier).state = 'Connected';
-              final startTime = ref.read(callStartTimeProvider);
-              if (startTime == null) {
-                ref.read(callStartTimeProvider.notifier).state = DateTime.now();
-                _startCallTimer();
-              }
-              break;
-            default:
-              break;
-          }
-        }
-      });
-    });
   }
 
   void _startCallTimer() {
@@ -212,6 +179,35 @@ class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
     final isSpeakerOn = ref.watch(isSpeakerOnProvider);
     final isHeld = ref.watch(isHeldProvider);
     final callDuration = ref.watch(callDurationProvider);
+    
+    // Listen to call state changes in build method
+    ref.listen<AsyncValue<Call>>(callStateProvider, (previous, next) {
+      next.whenData((call) {
+        if (call.id == widget.call.id) {
+          switch (call.state) {
+            case CallStateEnum.CONNECTING:
+              ref.read(callStatusProvider.notifier).state = 'Connecting...';
+              break;
+            case CallStateEnum.PROGRESS:
+              ref.read(callStatusProvider.notifier).state = 'Ringing...';
+              break;
+            case CallStateEnum.ACCEPTED:
+              ref.read(callStatusProvider.notifier).state = 'Call accepted';
+              break;
+            case CallStateEnum.CONFIRMED:
+              ref.read(callStatusProvider.notifier).state = 'Connected';
+              final startTime = ref.read(callStartTimeProvider);
+              if (startTime == null) {
+                ref.read(callStartTimeProvider.notifier).state = DateTime.now();
+                _startCallTimer();
+              }
+              break;
+            default:
+              break;
+          }
+        }
+      });
+    });
     final callStatus = ref.watch(callStatusProvider);
     final callStartTime = ref.watch(callStartTimeProvider);
     

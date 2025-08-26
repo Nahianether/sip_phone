@@ -1,12 +1,13 @@
 import 'dart:developer';
 
 import 'package:flutter_callkit_incoming/entities/android_params.dart';
+import 'package:flutter_callkit_incoming/entities/call_event.dart' show Event, CallEvent;
 import 'package:flutter_callkit_incoming/entities/call_kit_params.dart';
 import 'package:flutter_callkit_incoming/entities/ios_params.dart';
 import 'package:flutter_callkit_incoming/entities/notification_params.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 
-Future<void> showIncomming() async {
+Future<void> showIncomming(String uid, String no) async {
   try {
     // this._currentUuid = _uuid.v4();
     CallKitParams callKitParams = CallKitParams(
@@ -24,14 +25,14 @@ Future<void> showIncomming() async {
         subtitle: 'Missed call',
         callbackText: 'Call back',
       ),
-      callingNotification: const NotificationParams(
+      callingNotification: NotificationParams(
         showNotification: true,
         isShowCallback: true,
-        subtitle: 'Calling...',
+        subtitle: 'Calling... $no',
         callbackText: 'Hang Up',
       ),
       duration: 30000,
-      extra: <String, dynamic>{'userId': '1a2b3c4d'},
+      extra: <String, dynamic>{'userId': uid, 'no': no},
       headers: <String, dynamic>{'apiKey': 'Abc@123!', 'platform': 'flutter'},
       android: const AndroidParams(
         isCustomNotification: true,
@@ -86,4 +87,58 @@ Future<void> init_() async {
   } catch (e) {
     log(e.toString());
   }
+}
+
+void listenCallkit() {
+  FlutterCallkitIncoming.onEvent.listen((CallEvent? event) {
+    if (event == null) return;
+    switch (event.event) {
+      case Event.actionCallIncoming:
+        // TODO: received an incoming call
+        break;
+      case Event.actionCallStart:
+        // TODO: started an outgoing call
+        // TODO: show screen calling in Flutter
+        break;
+      case Event.actionCallAccept:
+        // TODO: accepted an incoming call
+        // TODO: show screen calling in Flutter
+        break;
+      case Event.actionCallDecline:
+        // TODO: declined an incoming call
+        break;
+      case Event.actionCallEnded:
+        // TODO: ended an incoming/outgoing call
+        break;
+      case Event.actionCallTimeout:
+        // TODO: missed an incoming call
+        break;
+      case Event.actionCallCallback:
+        // TODO: click action `Call back` from missed call notification
+        break;
+      case Event.actionCallToggleHold:
+        // TODO: only iOS
+        break;
+      case Event.actionCallToggleMute:
+        // TODO: only iOS
+        break;
+      case Event.actionCallToggleDmtf:
+        // TODO: only iOS
+        break;
+      case Event.actionCallToggleGroup:
+        // TODO: only iOS
+        break;
+      case Event.actionCallToggleAudioSession:
+        // TODO: only iOS
+        break;
+      case Event.actionDidUpdateDevicePushTokenVoip:
+        // TODO: only iOS
+        break;
+      case Event.actionCallCustom:
+        // TODO: for custom action
+        break;
+      default:
+        {}
+    }
+  });
 }

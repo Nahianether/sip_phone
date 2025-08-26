@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:sip_phone/services/call_kit.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'screens/home_screen.dart';
@@ -8,9 +7,14 @@ import 'screens/active_call_screen.dart';
 import 'screens/incoming_call_screen.dart';
 import 'services/navigation_service.dart';
 import 'services/websocket_service.dart';
+import 'services/permission_service.dart';
+import 'services/storage_service.dart';
+import 'services/sip_service.dart';
+import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await StorageService.initialize();
   runApp(const ProviderScope(child: SipPhoneApp()));
 }
 
@@ -22,7 +26,7 @@ class SipPhoneApp extends StatelessWidget {
     return MaterialApp(
       title: 'SIP Phone',
       navigatorKey: NavigationService.navigatorKey,
-      theme: ThemeData(primarySwatch: Colors.blue, visualDensity: VisualDensity.adaptivePlatformDensity),
+      theme: AppTheme.lightTheme,
       home: const PermissionWrapper(),
       routes: {
         '/home': (context) => const HomeScreen(),
@@ -47,16 +51,19 @@ class PermissionWrapper extends ConsumerStatefulWidget {
 }
 
 class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with WidgetsBindingObserver {
+  final PermissionService _permissionService = PermissionService();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _requestPermissions();
     checkAndNavigationCallingPage();
+    WidgetsBinding.instance.addPostFrameCallback((_) {});
   }
 
   Future<void> _requestPermissions() async {
-    await [Permission.microphone, Permission.camera].request();
+    await _permissionService.requestAllPermissions(context);
 
     WebSocketService.setMessageHandler((String message) {
       print('Received WebSocket message: $message');
@@ -66,16 +73,30 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
       print('WebSocket connection status changed: $isConnected');
     });
 
-    // SIP configuration as your server expects
-    final sipConfig = SipConfig(
-      wsUrl: 'wss://sip.ibos.io:8089/ws',
-      server: '564612@sip.ibos.io',
-      username: '564612',
-      password: 'iBOS123',
-      displayName: 'Remon',
-    );
-
-    await WebSocketService.connectWithSipConfig(sipConfig);
+    // Check for stored SIP credentials before attempting auto-connect
+    final storedSettings = StorageService.getSipSettings();
+    if (storedSettings != null && 
+        storedSettings.autoConnect == true &&
+        storedSettings.username?.isNotEmpty == true &&
+        storedSettings.password?.isNotEmpty == true &&
+        storedSettings.server?.isNotEmpty == true &&
+        storedSettings.wsUrl?.isNotEmpty == true) {
+      
+      print('Auto-connecting with stored credentials...');
+      // Use SipService instead of WebSocketService for proper SIP connection
+      final sipService = SipService();
+      await sipService.connect(
+        username: storedSettings.username!,
+        password: storedSettings.password!,
+        server: storedSettings.server!,
+        wsUrl: storedSettings.wsUrl!,
+        displayName: storedSettings.displayName,
+        saveCredentials: false, // Don't save again
+      );
+    } else {
+      print('Auto-connect skipped: missing credentials');
+    }
+    
     await init_();
   }
 

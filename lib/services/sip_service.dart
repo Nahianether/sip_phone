@@ -32,10 +32,14 @@ class SipService extends SipUaHelperListener {
   // Navigation service
   final NavigationService _navigationService = NavigationService();
 
-  final StreamController<RegistrationState> _registrationStateController =
+  // Pending calls system for FCM integration
+  final Map<String, Call> _pendingCalls = {};
+  Call? _activeCall;
+
+  StreamController<RegistrationState> _registrationStateController =
       StreamController<RegistrationState>.broadcast();
-  final StreamController<Call> _callStateController = StreamController<Call>.broadcast();
-  final StreamController<String> _reconnectStatusController = StreamController<String>.broadcast();
+  StreamController<Call> _callStateController = StreamController<Call>.broadcast();
+  StreamController<String> _reconnectStatusController = StreamController<String>.broadcast();
 
   Stream<RegistrationState> get registrationStream => _registrationStateController.stream;
   Stream<Call> get callStream => _callStateController.stream;
@@ -44,6 +48,104 @@ class SipService extends SipUaHelperListener {
   RegistrationState get registrationState => _registrationState;
   bool get connected => _connected;
   bool get isReconnecting => _isReconnecting;
+
+  // Safe helper stop method to avoid concurrent modification errors
+  Future<void> _safeStopHelper() async {
+    if (_helper == null) return;
+    
+    try {
+      // Give some time for any ongoing operations to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Stop the helper with error handling
+      _helper!.stop();
+      debugPrint('🔥 DEBUG: Helper stopped successfully');
+    } catch (e) {
+      debugPrint('🔥 DEBUG: Error stopping helper: $e');
+      // Force null the helper even if stop fails
+      _helper = null;
+    }
+  }
+
+  // Safe stream event methods that recreate controllers if closed
+  void _safeAddToRegistrationStream(RegistrationState state) {
+    try {
+      if (_registrationStateController.isClosed) {
+        debugPrint('🔥 DEBUG: Registration controller closed, recreating');
+        _registrationStateController = StreamController<RegistrationState>.broadcast();
+      }
+      _registrationStateController.add(state);
+    } catch (e) {
+      debugPrint('🔥 DEBUG: Error adding to registration stream: $e');
+    }
+  }
+
+  void _safeAddToCallStream(Call call) {
+    try {
+      if (_callStateController.isClosed) {
+        debugPrint('🔥 DEBUG: Call controller closed, recreating');
+        _callStateController = StreamController<Call>.broadcast();
+      }
+      _callStateController.add(call);
+    } catch (e) {
+      debugPrint('🔥 DEBUG: Error adding to call stream: $e');
+    }
+  }
+
+  void _safeAddToReconnectStream(String message) {
+    try {
+      if (_reconnectStatusController.isClosed) {
+        debugPrint('🔥 DEBUG: Reconnect controller closed, recreating');
+        _reconnectStatusController = StreamController<String>.broadcast();
+      }
+      _reconnectStatusController.add(message);
+    } catch (e) {
+      debugPrint('🔥 DEBUG: Error adding to reconnect stream: $e');
+    }
+  }
+
+  // Methods for managing pending calls
+  void _storePendingCall(String callerId, Call call) {
+    _pendingCalls[callerId] = call;
+    debugPrint('🔥 DEBUG: Stored pending call from $callerId');
+    debugPrint('🔥 DEBUG: Total pending calls: ${_pendingCalls.length}');
+    debugPrint('🔥 DEBUG: All pending call IDs: ${_pendingCalls.keys.toList()}');
+  }
+
+  Call? getPendingCall(String callerId) {
+    debugPrint('🔥 DEBUG: Looking for pending call with ID: $callerId');
+    debugPrint('🔥 DEBUG: Available pending call IDs: ${_pendingCalls.keys.toList()}');
+    
+    final call = _pendingCalls[callerId];
+    if (call != null) {
+      debugPrint('🔥 DEBUG: Found pending call from $callerId');
+      return call;
+    }
+    debugPrint('🔥 DEBUG: No pending call found for $callerId');
+    return null;
+  }
+
+  void removePendingCall(String callerId) {
+    _pendingCalls.remove(callerId);
+    debugPrint('🔥 DEBUG: Removed pending call from $callerId');
+  }
+
+  void _removePendingCall(String callerId) {
+    removePendingCall(callerId);
+  }
+
+  // Answer a pending call by caller ID
+  void answerPendingCall(String callerId) {
+    final call = getPendingCall(callerId);
+    if (call != null) {
+      debugPrint('🔥 DEBUG: Answering pending call from $callerId');
+      answer(call);
+      _activeCall = call;
+      _removePendingCall(callerId);
+    } else {
+      debugPrint('🔥 DEBUG: Cannot answer - no pending call from $callerId');
+    }
+  }
 
   Future<bool> connect({
     required String username,
@@ -56,7 +158,7 @@ class SipService extends SipUaHelperListener {
     try {
       // Validate input parameters
       if (username.isEmpty || password.isEmpty || server.isEmpty || wsUrl.isEmpty) {
-        _reconnectStatusController.add('Invalid connection parameters');
+        _safeAddToReconnectStream('Invalid connection parameters');
         return false;
       }
 
@@ -67,12 +169,39 @@ class SipService extends SipUaHelperListener {
       _lastWsUrl = wsUrl;
       _lastDisplayName = displayName ?? username;
 
-      // Disconnect existing connection if any
-      if (_helper != null) {
+      // CRITICAL FIX: Don't disconnect if we're already connected with same credentials
+      // and have pending calls - this prevents FCM auto-reconnect from killing active calls
+      if (_helper != null && _connected) {
+        // Check if credentials are the same
+        bool sameCredentials = _lastUsername == username &&
+                              _lastPassword == password &&
+                              _lastServer == server &&
+                              _lastWsUrl == wsUrl;
+        
+        if (sameCredentials) {
+          // Check if we have pending or active calls
+          if (_pendingCalls.isNotEmpty || _activeCall != null) {
+            debugPrint('🔥 DEBUG: Skipping reconnect - have active/pending calls with same credentials');
+            _safeAddToReconnectStream('Already connected - preserving active calls');
+            return true;
+          }
+        }
+        
+        // Only disconnect if credentials changed or no active calls
+        debugPrint('🔥 DEBUG: Disconnecting - credentials changed or no active calls');
         try {
-          _helper!.stop();
+          await _safeStopHelper();
         } catch (e) {
-          // Ignore errors during cleanup
+          debugPrint('🔥 DEBUG: Error stopping helper safely: $e');
+        }
+        _helper = null;
+        await Future.delayed(const Duration(milliseconds: 500)); // Allow cleanup
+      } else if (_helper != null) {
+        // Not connected but helper exists - clean it up
+        try {
+          await _safeStopHelper();
+        } catch (e) {
+          debugPrint('🔥 DEBUG: Error stopping helper safely: $e');
         }
         _helper = null;
         await Future.delayed(const Duration(milliseconds: 500)); // Allow cleanup
@@ -105,7 +234,7 @@ class SipService extends SipUaHelperListener {
 
       // Validate critical settings before starting
       if (settings.webSocketUrl == null || settings.uri == null || settings.transportType == null) {
-        _reconnectStatusController.add('Invalid SIP settings configuration');
+        _safeAddToReconnectStream('Invalid SIP settings configuration');
         return false;
       }
 
@@ -114,9 +243,9 @@ class SipService extends SipUaHelperListener {
       // Add null check and error handling for start
       try {
         _helper!.start(settings);
-        _reconnectStatusController.add('Connecting to SIP server...');
+        _safeAddToReconnectStream('Connecting to SIP server...');
       } catch (startError) {
-        _reconnectStatusController.add('Failed to start SIP connection: $startError');
+        _safeAddToReconnectStream('Failed to start SIP connection: $startError');
         _helper = null;
         return false;
       }
@@ -132,7 +261,7 @@ class SipService extends SipUaHelperListener {
 
       return true;
     } catch (e) {
-      _reconnectStatusController.add('Connection error: $e');
+      _safeAddToReconnectStream('Connection error: $e');
       _helper = null;
 
       if (_autoReconnectEnabled && !_isReconnecting) {
@@ -148,7 +277,7 @@ class SipService extends SipUaHelperListener {
     }
 
     _reconnectAttempts++;
-    _reconnectStatusController.add('Reconnecting... ($_reconnectAttempts/$_maxReconnectAttempts)');
+    _safeAddToReconnectStream('Reconnecting... ($_reconnectAttempts/$_maxReconnectAttempts)');
 
     final success = await connect(
       username: _lastUsername!,
@@ -161,10 +290,10 @@ class SipService extends SipUaHelperListener {
 
     if (success) {
       _isReconnecting = false;
-      _reconnectStatusController.add('Reconnected successfully');
+      _safeAddToReconnectStream('Reconnected successfully');
     } else if (_reconnectAttempts >= _maxReconnectAttempts) {
       _isReconnecting = false;
-      _reconnectStatusController.add('Failed to reconnect after $_maxReconnectAttempts attempts');
+      _safeAddToReconnectStream('Failed to reconnect after $_maxReconnectAttempts attempts');
     } else {
       _scheduleReconnect();
     }
@@ -179,7 +308,7 @@ class SipService extends SipUaHelperListener {
         : _reconnectDelays.length - 1;
     final delay = _reconnectDelays[delayIndex];
 
-    _reconnectStatusController.add('Reconnecting in $delay seconds...');
+    _safeAddToReconnectStream('Reconnecting in $delay seconds...');
 
     _reconnectTimer = Timer(Duration(seconds: delay), () {
       _attemptReconnect();
@@ -205,32 +334,32 @@ class SipService extends SipUaHelperListener {
 
     if (_helper != null) {
       try {
-        _helper!.stop();
+        await _safeStopHelper();
       } catch (e) {
-        // Ignore errors during disconnect
+        debugPrint('🔥 DEBUG: Error during disconnect: $e');
       }
       _helper = null;
     }
     _connected = false;
     _registrationState = RegistrationState(state: RegistrationStateEnum.NONE);
-    _registrationStateController.add(_registrationState);
-    _reconnectStatusController.add('Disconnected');
+    _safeAddToRegistrationStream(_registrationState);
+    _safeAddToReconnectStream('Disconnected');
   }
 
   Future<bool> makeCall(String target) async {
     if (_helper == null) {
-      _reconnectStatusController.add('SIP service not initialized');
+      _safeAddToReconnectStream('SIP service not initialized');
       return false;
     }
 
     if (!_connected) {
-      _reconnectStatusController.add('Not connected to SIP server');
+      _safeAddToReconnectStream('Not connected to SIP server');
       return false;
     }
 
     try {
       debugPrint('🔥 DEBUG: makeCall called - target: $target, connected: $_connected');
-      _reconnectStatusController.add('Initiating call to $target...');
+      _safeAddToReconnectStream('Initiating call to $target...');
 
       // Enhanced call options for better compatibility
       final mediaConstraints = {'audio': true, 'video': false};
@@ -251,14 +380,14 @@ class SipService extends SipUaHelperListener {
       final success = await _helper!.call(target, voiceOnly: true, customOptions: callOptions);
 
       if (success) {
-        _reconnectStatusController.add('Call initiated to $target');
+        _safeAddToReconnectStream('Call initiated to $target');
       } else {
-        _reconnectStatusController.add('Failed to initiate call to $target');
+        _safeAddToReconnectStream('Failed to initiate call to $target');
       }
 
       return success;
     } catch (e) {
-      _reconnectStatusController.add('Call error: $e');
+      _safeAddToReconnectStream('Call error: $e');
       return false;
     }
   }
@@ -280,11 +409,11 @@ class SipService extends SipUaHelperListener {
       };
       
       call.answer(answerOptions);
-      _reconnectStatusController.add('Call answered');
+      _safeAddToReconnectStream('Call answered');
       debugPrint('🔥 DEBUG: Call.answer() method called successfully');
     } catch (e) {
       debugPrint('🔥 DEBUG: Error in answer() method: $e');
-      _reconnectStatusController.add('Error answering call: $e');
+      _safeAddToReconnectStream('Error answering call: $e');
     }
   }
 
@@ -334,11 +463,17 @@ class SipService extends SipUaHelperListener {
     _registrationState = state;
     final wasConnected = _connected;
     _connected = state.state == RegistrationStateEnum.REGISTERED;
-    _registrationStateController.add(state);
+    _safeAddToRegistrationStream(state);
 
     // Trigger reconnection on registration failure or unregistered state
     if (wasConnected && !_connected && _autoReconnectEnabled && !_isReconnecting) {
-      _scheduleReconnect();
+      // Don't reconnect if we have active or pending calls
+      if (_pendingCalls.isNotEmpty || _activeCall != null) {
+        debugPrint('🔥 DEBUG: Registration lost but preserving calls - not reconnecting');
+        _safeAddToReconnectStream('Registration lost during call - preserving call state');
+      } else {
+        _scheduleReconnect();
+      }
     }
   }
 
@@ -346,14 +481,20 @@ class SipService extends SipUaHelperListener {
   void transportStateChanged(TransportState state) {
     // Handle transport disconnection
     if (state.state == TransportStateEnum.DISCONNECTED && _connected && _autoReconnectEnabled && !_isReconnecting) {
-      _scheduleReconnect();
+      // Don't reconnect if we have active or pending calls - this prevents call drops
+      if (_pendingCalls.isNotEmpty || _activeCall != null) {
+        debugPrint('🔥 DEBUG: Transport disconnected but preserving calls - not reconnecting');
+        _safeAddToReconnectStream('Connection lost during call - preserving call state');
+      } else {
+        _scheduleReconnect();
+      }
     }
   }
 
   @override
   void callStateChanged(Call call, CallState callState) {
     debugPrint('🔥 DEBUG: callStateChanged called - State: ${callState.state}, Direction: ${call.direction}');
-    _callStateController.add(call);
+    _safeAddToCallStream(call);
 
     // Add detailed call state logging
     String statusMessage = '';
@@ -444,7 +585,7 @@ class SipService extends SipUaHelperListener {
         statusMessage = 'Call state: ${callState.state}';
     }
 
-    _reconnectStatusController.add(statusMessage);
+    _safeAddToReconnectStream(statusMessage);
     debugPrint('SIP: $statusMessage - Direction: ${call.direction}');
   }
 
@@ -455,9 +596,14 @@ class SipService extends SipUaHelperListener {
 
   // Handle incoming calls when they arrive
   void _handleIncomingCall(Call call) {
-    _callStateController.add(call);
-    _reconnectStatusController.add('Incoming call from ${call.remote_identity}');
+    _safeAddToCallStream(call);
+    _safeAddToReconnectStream('Incoming call from ${call.remote_identity}');
     debugPrint('SIP: Incoming call from ${call.remote_identity}');
+
+    // Extract caller ID and store the call for FCM integration
+    final callerId = _extractCallerIdFromCall(call);
+    _storePendingCall(callerId, call);
+    debugPrint('🔥 DEBUG: Stored incoming call from $callerId for FCM integration');
 
     Future.delayed(Duration(milliseconds: 100), () {
       final context = NavigationService.navigatorKey.currentContext;
@@ -468,6 +614,47 @@ class SipService extends SipUaHelperListener {
         debugPrint('🔥 DEBUG: Incoming call - No context available for navigation');
       }
     });
+  }
+
+  String _extractCallerIdFromCall(Call call) {
+    // Extract caller ID from the SIP call
+    final remoteIdentity = call.remote_identity ?? 'Unknown';
+    debugPrint('🔥 DEBUG: Raw remote_identity: $remoteIdentity');
+    
+    // Also check display_name and remote_identity separately
+    debugPrint('🔥 DEBUG: Call display_name: ${call.remote_display_name}');
+    debugPrint('🔥 DEBUG: Call direction: ${call.direction}');
+    debugPrint('🔥 DEBUG: Call state: ${call.state}');
+    
+    // Try multiple extraction patterns
+    // Pattern 1: "Display Name" <sip:123456@domain.com>
+    final pattern1 = RegExp(r'"([^"]+)"\s*<sip:([^@]+)@');
+    final match1 = pattern1.firstMatch(remoteIdentity);
+    
+    if (match1 != null) {
+      final extractedId = match1.group(2) ?? 'Unknown';
+      debugPrint('🔥 DEBUG: Extracted caller ID (pattern 1): $extractedId');
+      return extractedId;
+    }
+    
+    // Pattern 2: sip:123456@domain.com
+    final pattern2 = RegExp(r'sip:([^@]+)@');
+    final match2 = pattern2.firstMatch(remoteIdentity);
+    
+    if (match2 != null) {
+      final extractedId = match2.group(1) ?? 'Unknown';
+      debugPrint('🔥 DEBUG: Extracted caller ID (pattern 2): $extractedId');
+      return extractedId;
+    }
+    
+    // Pattern 3: Just the display name if available
+    if (call.remote_display_name != null && call.remote_display_name!.isNotEmpty) {
+      debugPrint('🔥 DEBUG: Using display name as caller ID: ${call.remote_display_name}');
+      return call.remote_display_name!;
+    }
+    
+    debugPrint('🔥 DEBUG: Could not extract caller ID, using raw identity');
+    return remoteIdentity;
   }
 
   @override
@@ -483,8 +670,40 @@ class SipService extends SipUaHelperListener {
   void dispose() {
     _cancelReconnectTimer();
     _heartbeatTimer?.cancel();
-    _registrationStateController.close();
-    _callStateController.close();
-    _reconnectStatusController.close();
+    
+    // Don't close stream controllers if we have active or pending calls
+    // This prevents "Bad state: Cannot add new events after calling close" errors
+    if (_pendingCalls.isEmpty && _activeCall == null) {
+      debugPrint('🔥 DEBUG: Closing stream controllers - no active calls');
+      _registrationStateController.close();
+      _callStateController.close();
+      _reconnectStatusController.close();
+    } else {
+      debugPrint('🔥 DEBUG: Keeping stream controllers open - have ${_pendingCalls.length} pending calls and active call: ${_activeCall != null}');
+    }
+  }
+  
+  // Force dispose for complete shutdown
+  void forceDispose() {
+    _cancelReconnectTimer();
+    _heartbeatTimer?.cancel();
+    _pendingCalls.clear();
+    _activeCall = null;
+    
+    try {
+      _registrationStateController.close();
+    } catch (e) {
+      debugPrint('🔥 DEBUG: Error closing registration controller: $e');
+    }
+    try {
+      _callStateController.close();
+    } catch (e) {
+      debugPrint('🔥 DEBUG: Error closing call controller: $e');
+    }
+    try {
+      _reconnectStatusController.close();
+    } catch (e) {
+      debugPrint('🔥 DEBUG: Error closing reconnect controller: $e');
+    }
   }
 }

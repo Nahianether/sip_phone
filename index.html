@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM HTTP v1 API Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .info-box {
+            background: #e8f4fd;
+            border: 1px solid #2196f3;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .info-box h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .info-box p {
+            color: #1976d2;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .warning-box h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .warning-box p {
+            color: #856404;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .steps {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .steps h4 {
+            color: #495057;
+            margin-bottom: 15px;
+        }
+
+        .steps ol {
+            color: #495057;
+            line-height: 1.6;
+            padding-left: 20px;
+        }
+
+        .steps li {
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 25px;
+                margin: 10px;
+            }
+
+            .title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🔥 FCM v1 API Tester</h1>
+            <p class="subtitle">Modern Firebase Cloud Messaging</p>
+        </div>
+
+        <div class="warning-box">
+            <h4>⚠️ Legacy API Discontinued</h4>
+            <p>The legacy FCM API (server keys) was discontinued on June 20, 2024. This tool uses the modern HTTP v1
+                API.</p>
+        </div>
+
+        <div class="steps">
+            <h4>📋 Setup Instructions:</h4>
+            <ol>
+                <li>Go to Firebase Console → Project Settings → Service Accounts</li>
+                <li>Click "Generate New Private Key" and download the JSON file</li>
+                <li>Extract your <code>project_id</code> from the JSON file</li>
+                <li>Get your FCM token from your Flutter app</li>
+                <li>Use this tool to send data-only notifications</li>
+            </ol>
+        </div>
+
+        <div class="info-box">
+            <h4>🔧 For Quick Testing (Legacy Method):</h4>
+            <p>If you need the legacy server key for testing:</p>
+            <p>1. Firebase Console → Cloud Messaging → Click 3-dots next to "Cloud Messaging API (Legacy)"</p>
+            <p>2. Enable the API in Google Cloud Console</p>
+            <p>3. Return to Firebase and refresh to see the Server Key</p>
+        </div>
+
+        <form id="fcmForm">
+            <div class="form-group">
+                <label for="projectId">🏗️ Firebase Project ID</label>
+                <input type="text" id="projectId" placeholder="your-project-id" required>
+                <small style="color: #666;">Found in your service account JSON file</small>
+            </div>
+
+            <div class="form-group">
+                <label for="fcmToken">📱 FCM Device Token</label>
+                <input type="text" id="fcmToken" placeholder="eRloaS6RRa2UJo7B7myAV0..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="payload">📝 Message Payload (Data-Only)</label>
+                <textarea id="payload" required></textarea>
+            </div>
+
+            <button type="submit" class="btn">🚀 Send Notification (Requires Backend)</button>
+        </form>
+
+        <div id="result" class="result"></div>
+
+        <div class="info-box" style="margin-top: 30px;">
+            <h4>💡 Implementation Note:</h4>
+            <p>The HTTP v1 API requires server-side OAuth2 authentication. You'll need to implement this in your backend
+                using the service account JSON file.</p>
+        </div>
+    </div>
+
+    <script>
+        const defaultPayload = {
+            "message": {
+                "token": "",
+                "data": {
+                    "type": "incoming_call",
+                    "caller_name": "John Doe",
+                    "caller_id": "+1234567890",
+                    "call_uuid": "test-" + Date.now(),
+                    "auto_launch": "true"
+                },
+                "android": {
+                    "priority": "high"
+                },
+                "apns": {
+                    "headers": {
+                        "apns-priority": "10"
+                    }
+                }
+            }
+        };
+
+        function updatePayload() {
+            const fcmToken = document.getElementById('fcmToken').value;
+            const payload = { ...defaultPayload };
+            payload.message.token = fcmToken;
+            document.getElementById('payload').value = JSON.stringify(payload, null, 2);
+        }
+
+        function showResult(message, type) {
+            const result = document.getElementById('result');
+            result.className = `result ${type}`;
+            result.textContent = message;
+            result.style.display = 'block';
+            result.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('fcmToken').addEventListener('input', updatePayload);
+
+        document.getElementById('fcmForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            showResult(`❌ HTTP v1 API requires backend implementation!
+
+To use the modern FCM HTTP v1 API, you need:
+
+1. A backend server (Node.js, PHP, Python, etc.)
+2. OAuth2 authentication using your service account JSON
+3. Access token generation
+
+Sample Node.js implementation:
+
+const admin = require('firebase-admin');
+const serviceAccount = require('./service-account.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const message = ${document.getElementById('payload').value};
+
+admin.messaging().send(message.message)
+  .then(response => console.log('Success:', response))
+  .catch(error => console.error('Error:', error));
+
+For testing purposes, you can still use the legacy server key method from the first tool I provided.`, 'error');
+        });
+
+        // Initialize
+        updatePayload();
+    </script>
+</body>
+
+</html>

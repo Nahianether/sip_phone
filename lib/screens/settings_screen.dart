@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sip_ua/sip_ua.dart';
 import '../services/sip_service.dart';
+import '../services/background_call_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -11,7 +13,9 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SipService _sipService = SipService();
+  final BackgroundCallService _backgroundService = BackgroundCallService();
   final _formKey = GlobalKey<FormState>();
+  String? _fcmToken;
   
   // Connection Type
   String _connectionType = 'WebSocket';
@@ -29,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSavedCredentials();
+    _loadFCMToken();
   }
 
   Future<void> _loadSavedCredentials() async {
@@ -42,6 +47,158 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _passwordController.text = credentials['password'] ?? '';
       _displayNameController.text = credentials['displayName'] ?? '';
     });
+  }
+
+  Future<void> _loadFCMToken() async {
+    final token = await _backgroundService.getFCMToken();
+    setState(() {
+      _fcmToken = token;
+    });
+  }
+
+  Future<void> _copyFCMToken() async {
+    if (_fcmToken != null) {
+      await Clipboard.setData(ClipboardData(text: _fcmToken!));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('FCM Token copied to clipboard'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showBackgroundCallInstructions() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Background Call Setup'),
+        content: SingleChildScrollView(
+          child: Text(_backgroundService.getServerIntegrationInstructions()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showFCMTestInstructions() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🧪 FCM Testing Guide'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Test FCM notifications using Firebase Console:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              const Text('1. 🌐 Go to Firebase Console'),
+              const Text('   console.firebase.google.com'),
+              const SizedBox(height: 8),
+              const Text('2. 📱 Select your project'),
+              const SizedBox(height: 8),
+              const Text('3. 📬 Go to Cloud Messaging'),
+              const SizedBox(height: 8),
+              const Text('4. ➕ Click "Send your first message"'),
+              const SizedBox(height: 16),
+              const Text(
+                'Test Configuration:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '📝 Notification:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Text('Title: Incoming Call from John Doe'),
+                    const Text('Body: Tap to answer the call'),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '🎯 Target:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Text('Token: (Copy from above)'),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '⚙️ Additional Options > Advanced:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Text('Custom data:'),
+                    Container(
+                      margin: const EdgeInsets.only(left: 16, top: 4),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('type: incoming_call'),
+                          Text('caller_id: 01687722962'),
+                          Text('caller_name: John Doe'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '🧪 Test Scenarios:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+              ),
+              const SizedBox(height: 8),
+              const Text('• App in foreground → Check debug logs'),
+              const Text('• App in background → Should wake app'),
+              const Text('• App closed → Should open app'),
+              const SizedBox(height: 16),
+              const Text(
+                '👀 Watch Flutter logs for:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  '🔥 FCM Foreground message received!\n🔥 FCM: *** INCOMING CALL SIMULATION ***',
+                  style: TextStyle(
+                    color: Colors.greenAccent,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _connect() async {
@@ -364,6 +521,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
+            const SizedBox(height: 30),
+            
+            // Background Calls Section
+            const Divider(),
+            const SizedBox(height: 20),
+            const Text(
+              'Background Calls (FCM + CallKit)',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'FCM Token for Server Integration',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _showBackgroundCallInstructions,
+                        child: const Text('Setup Guide'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _fcmToken ?? 'Loading FCM token...',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              color: _fcmToken != null ? Colors.black87 : Colors.grey,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _fcmToken != null ? _copyFCMToken : null,
+                          icon: const Icon(Icons.copy, size: 20),
+                          tooltip: 'Copy token',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Send this token to your SIP server to enable background calls when app is closed.',
+                    style: TextStyle(fontSize: 12, color: Colors.blue),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () => _showFCMTestInstructions(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('📱 Test FCM Notifications'),
+                  ),
+                ],
+              ),
+            ),
+            
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),

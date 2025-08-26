@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "867520881257",
+    "project_id": "sip-phone-voip",
+    "storage_bucket": "sip-phone-voip.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:867520881257:android:63e4e22446131b8f3778f8",
+        "android_client_info": {
+          "package_name": "com.example.sip_phone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAU6J9qHdDcynsyvfS7DwMFCxFTTCP2dlo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

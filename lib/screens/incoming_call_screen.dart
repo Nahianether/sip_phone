@@ -16,6 +16,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   final SipService _sipService = SipService();
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  bool _callAnswered = false;
 
   @override
   void initState() {
@@ -41,11 +42,30 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   void _acceptCall() {
+    if (_callAnswered) {
+      print('🔥 DEBUG: Call already answered, ignoring tap');
+      return;
+    }
+    
+    setState(() {
+      _callAnswered = true;
+    });
+    
     print('🔥 DEBUG: User tapped accept button');
-    _sipService.answer(widget.call);
-    print('🔥 DEBUG: Called _sipService.answer(), waiting for call state changes...');
-    // Don't navigate immediately - let the SIP service handle navigation
-    // when the call reaches CONFIRMED state
+    
+    try {
+      print('🔥 DEBUG: Attempting to answer call - Call ID: ${widget.call.id}');
+      _sipService.answer(widget.call);
+      print('🔥 DEBUG: Call.answer() method called successfully');
+      print('🔥 DEBUG: Called _sipService.answer(), waiting for call state changes...');
+      // Don't navigate immediately - let the SIP service handle navigation
+      // when the call reaches CONFIRMED state
+    } catch (e) {
+      print('🔥 DEBUG: Error answering call: $e');
+      setState(() {
+        _callAnswered = false; // Reset if error
+      });
+    }
   }
 
   void _declineCall() {
@@ -127,19 +147,28 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                   ),
                   // Accept Button
                   GestureDetector(
-                    onTap: _acceptCall,
+                    onTap: _callAnswered ? null : _acceptCall,
                     child: Container(
                       width: 70,
                       height: 70,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
+                      decoration: BoxDecoration(
+                        color: _callAnswered ? Colors.grey : Colors.green,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.call,
-                        color: Colors.white,
-                        size: 35,
-                      ),
+                      child: _callAnswered 
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.call,
+                            color: Colors.white,
+                            size: 35,
+                          ),
                     ),
                   ),
                 ],

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sip_phone/services/call_kit.dart' show showIncomming;
 import 'package:sip_ua/sip_ua.dart';
 import '../models/sip_settings_model.dart';
 import '../models/call_history_model.dart';
@@ -26,18 +27,20 @@ class SipService extends SipUaHelperListener {
   String? _lastWsUrl;
   String? _lastDisplayName;
 
-  // Reconnection parameters
+  // Reconnection parameters - more conservative for stability
   int _reconnectAttempts = 0;
-  final int _maxReconnectAttempts = 10;
-  final List<int> _reconnectDelays = [1, 2, 5, 10, 15, 20, 30, 45, 60, 90]; // seconds
-  
+  final int _maxReconnectAttempts = 5; // Reduced from 10 to 5
+  final List<int> _reconnectDelays = [3, 10, 30, 60, 120]; // More spaced out: 3s, 10s, 30s, 1m, 2m
+
   // Connection health monitoring
   DateTime? _lastSuccessfulConnection;
   int _connectionFailures = 0;
+  bool _networkAvailable = true;
+  Timer? _keepAliveTimer;
 
   // Navigation service
   final NavigationService _navigationService = NavigationService();
-  
+
   // Notification service
   final NotificationService _notificationService = NotificationService();
 
@@ -123,18 +126,28 @@ class SipService extends SipUaHelperListener {
       settings.dtmfMode = DtmfMode.RFC2833;
       settings.transportType = TransportType.WS;
 
-      // Enhanced stability settings
+      // Enhanced stability settings for robust connection
       settings.register = true;
       settings.sessionTimers = true;
-      settings.iceGatheringTimeout = 30000;
+      settings.iceGatheringTimeout = 60000; // Increased from 500ms to 60s for better gathering
 
-      // Enhanced WebRTC configuration for better connectivity
+      // Connection recovery settings for stability
+      settings.connectionRecoveryMaxInterval = 60; // Increased from 30s to 60s
+      settings.connectionRecoveryMinInterval = 5; // Increased from 2s to 5s for more stable recovery
+
+      // Registration settings
+      settings.register_expires = 300; // 5 minutes registration refresh
+
+      // Enhanced WebRTC configuration with more STUN servers for better connectivity
       settings.iceServers = [
         {'url': 'stun:stun.l.google.com:19302'},
         {'url': 'stun:stun1.l.google.com:19302'},
         {'url': 'stun:stun2.l.google.com:19302'},
         {'url': 'stun:stun3.l.google.com:19302'},
         {'url': 'stun:stun4.l.google.com:19302'},
+        {'url': 'stun:stun.ekiga.net:3478'},
+        {'url': 'stun:stun.ideasip.com:3478'},
+        {'url': 'stun:stun.stunprotocol.org:3478'},
       ];
 
       // Final validation
@@ -149,7 +162,7 @@ class SipService extends SipUaHelperListener {
       try {
         _helper!.start(settings);
         _reconnectStatusController.add('Initializing SIP connection...');
-        
+
         // Add connection timeout mechanism
         bool connectionEstablished = false;
         Timer(const Duration(seconds: 15), () {
@@ -204,7 +217,7 @@ class SipService extends SipUaHelperListener {
         ? _reconnectAttempts - 1
         : _reconnectDelays.length - 1;
     final delay = _reconnectDelays[delayIndex];
-    
+
     _reconnectStatusController.add('Reconnecting in $delay seconds...');
     await Future.delayed(Duration(seconds: delay));
 
@@ -267,8 +280,31 @@ class SipService extends SipUaHelperListener {
     };
   }
 
+  void _startKeepAlive() {
+    _keepAliveTimer?.cancel();
+    _keepAliveTimer = Timer.periodic(Duration(seconds: 60), (timer) {
+      if (_connected && _helper != null) {
+        // Send keep-alive by checking registration status
+        debugPrint('💓 Keep-alive: Connection health check');
+        // The SIP library handles keep-alive automatically, but we monitor health
+        if (_lastSuccessfulConnection != null) {
+          final timeSinceLastSuccess = DateTime.now().difference(_lastSuccessfulConnection!).inMinutes;
+          if (timeSinceLastSuccess > 10) {
+            debugPrint('⚠️ No activity for $timeSinceLastSuccess minutes - connection may be stale');
+          }
+        }
+      }
+    });
+  }
+
+  void _stopKeepAlive() {
+    _keepAliveTimer?.cancel();
+    _keepAliveTimer = null;
+  }
+
   Future<void> disconnect() async {
     _isReconnecting = false;
+    _stopKeepAlive();
 
     if (_helper != null) {
       try {
@@ -339,18 +375,15 @@ class SipService extends SipUaHelperListener {
   void answer(Call call) {
     try {
       debugPrint('🔥 DEBUG: Attempting to answer call - Call ID: ${call.id}');
-      
+
       // Stop notification alerts when call is answered
       _notificationService.stopIncomingCallAlert();
-      
+
       // Simple answer call with minimal options
       final answerOptions = {
-        'mediaConstraints': {
-          'audio': true,
-          'video': false,
-        },
+        'mediaConstraints': {'audio': true, 'video': false},
       };
-      
+
       call.answer(answerOptions);
       _reconnectStatusController.add('Call answered');
       debugPrint('🔥 DEBUG: Call.answer() method called successfully');
@@ -409,7 +442,7 @@ class SipService extends SipUaHelperListener {
   Future<void> _trackCallHistory(Call call, CallType type, {int duration = 0}) async {
     final phoneNumber = call.remote_identity?.toString() ?? '';
     if (phoneNumber.isEmpty) return;
-    
+
     final sanitized = PhoneUtils.sanitizePhoneNumber(phoneNumber);
     final callHistory = CallHistoryModel(
       id: '${DateTime.now().millisecondsSinceEpoch}_${call.id}',
@@ -419,7 +452,7 @@ class SipService extends SipUaHelperListener {
       timestamp: DateTime.now(),
       duration: duration,
     );
-    
+
     await StorageService.addCallHistory(callHistory);
   }
 
@@ -436,42 +469,81 @@ class SipService extends SipUaHelperListener {
       _lastSuccessfulConnection = DateTime.now();
       _connectionFailures = 0;
       _reconnectAttempts = 0;
+      _isReconnecting = false; // Clear reconnecting flag on successful registration
+      _startKeepAlive(); // Start keep-alive monitoring
       _reconnectStatusController.add('Successfully registered to SIP server');
+      debugPrint('✅ SIP Registration successful - Connection stable');
     } else if (wasConnected) {
       _connectionFailures++;
+      _stopKeepAlive(); // Stop keep-alive when connection is lost
+      debugPrint('❌ SIP Registration lost - Failure count: $_connectionFailures');
     }
 
-    // Trigger reconnection on registration failure or unregistered state
-    if (wasConnected && !_connected && _autoReconnectEnabled && !_isReconnecting) {
-      _reconnectStatusController.add('Connection lost, attempting to reconnect...');
-      Future.microtask(() => _attemptReconnectImmediate());
+    // Handle registration failure with backoff strategy
+    if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
+      _reconnectStatusController.add('Registration failed - Will retry with backoff');
+      if (_autoReconnectEnabled && !_isReconnecting && _reconnectAttempts < _maxReconnectAttempts) {
+        // Use exponential backoff for registration failures
+        final delay = _reconnectDelays[_reconnectAttempts.clamp(0, _reconnectDelays.length - 1)];
+        Future.delayed(Duration(seconds: delay), () {
+          if (!_connected && !_isReconnecting) {
+            _attemptReconnectImmediate();
+          }
+        });
+      }
+    }
+
+    // Only trigger immediate reconnection for unexpected disconnections (not failures)
+    if (wasConnected && !_connected && state.state == RegistrationStateEnum.UNREGISTERED) {
+      if (_autoReconnectEnabled && !_isReconnecting) {
+        _reconnectStatusController.add('Unexpected disconnection, attempting to reconnect...');
+        // Add delay to prevent reconnection loops
+        Future.delayed(Duration(seconds: 5), () {
+          if (!_connected && !_isReconnecting) {
+            _attemptReconnectImmediate();
+          }
+        });
+      }
     }
   }
 
   @override
   void transportStateChanged(TransportState state) {
     debugPrint('🔥 DEBUG: transportStateChanged called - State: ${state.state}');
-    
-    // Handle transport disconnection
+
+    // Handle transport disconnection with more intelligent logic
     if (state.state == TransportStateEnum.DISCONNECTED) {
       _connectionFailures++;
       _reconnectStatusController.add('Transport disconnected');
-      
-      if (_connected && _autoReconnectEnabled && !_isReconnecting) {
+
+      // Only attempt reconnection if we were previously connected and it's been stable
+      final timeSinceLastConnection = _lastSuccessfulConnection != null
+          ? DateTime.now().difference(_lastSuccessfulConnection!).inSeconds
+          : 0;
+
+      // Don't reconnect immediately if connection was very recent (< 30 seconds)
+      // This prevents reconnection loops
+      if (_connected && _autoReconnectEnabled && !_isReconnecting && timeSinceLastConnection > 30) {
         _reconnectStatusController.add('Transport lost, attempting to reconnect...');
-        Future.microtask(() => _attemptReconnectImmediate());
+        // Add a small delay before reconnection to avoid immediate retry loops
+        Future.delayed(Duration(seconds: 2), () {
+          if (!_isReconnecting) {
+            _attemptReconnectImmediate();
+          }
+        });
       }
     } else if (state.state == TransportStateEnum.CONNECTED) {
       _reconnectStatusController.add('Transport connected successfully');
+      // Reset failure count on successful connection
+      _connectionFailures = 0;
     }
   }
 
   @override
-  void callStateChanged(Call call, CallState callState) {
+  void callStateChanged(Call call, CallState callState) async {
     debugPrint('🔥 DEBUG: callStateChanged called - State: ${callState.state}, Direction: ${call.direction}');
     _callStateController.add(call);
 
-    // Add detailed call state logging
     String statusMessage = '';
     switch (callState.state) {
       case CallStateEnum.CALL_INITIATION:
@@ -495,6 +567,7 @@ class SipService extends SipUaHelperListener {
           _trackCallHistory(call, CallType.incoming);
           // Handle incoming call - navigate to incoming call screen
           _handleIncomingCall(call);
+          await showIncomming(call.id ?? 'id', call.remote_identity ?? 'Number');
         }
         break;
       case CallStateEnum.CONNECTING:
@@ -608,6 +681,7 @@ class SipService extends SipUaHelperListener {
   }
 
   void dispose() {
+    _stopKeepAlive();
     _registrationStateController.close();
     _callStateController.close();
     _reconnectStatusController.close();

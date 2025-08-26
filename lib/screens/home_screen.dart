@@ -4,6 +4,7 @@ import 'package:sip_ua/sip_ua.dart';
 import '../providers/sip_providers.dart';
 import 'dialer_screen.dart';
 import 'active_call_screen.dart';
+import 'websocket_test_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -24,25 +25,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _attemptAutoConnect() async {
     final sipService = ref.read(sipServiceProvider);
     final credentials = await sipService.getSavedCredentials();
-    
+
     // Check if all required credentials are available and autoConnect is enabled
-    if (credentials['username'] != null && 
-        credentials['password'] != null && 
+    if (credentials['username'] != null &&
+        credentials['password'] != null &&
         credentials['server'] != null &&
         credentials['wsUrl'] != null) {
-      
       // Check if autoConnect is enabled in saved settings
       final settings = sipService.getSavedSettings();
       if (settings?.autoConnect != true) {
         debugPrint('Auto-connect disabled in settings');
         return;
       }
-      
+
       String server = credentials['server']!;
       if (credentials['username']!.contains('@')) {
         server = credentials['username']!.split('@')[1];
       }
-      
+
       debugPrint('Attempting auto-connect with saved credentials');
       await sipService.connect(
         username: credentials['username']!,
@@ -77,12 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onPressed: () {
               sipService.answer(call);
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ActiveCallScreen(call: call),
-                ),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ActiveCallScreen(call: call)));
             },
             child: const Text('Answer'),
           ),
@@ -98,13 +93,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       next.whenData((call) {
         final callManager = ref.read(callManagerProvider);
         callManager.addCall(call);
-        
+
         if (call.direction == 'incoming') {
           _showIncomingCallDialog(call);
         }
       });
     });
-    
+
     // Simply return the DialerScreen with its own tab navigation
     return const DialerScreen();
   }

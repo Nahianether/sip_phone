@@ -32,8 +32,12 @@ final activeCallsProvider = StreamProvider<Map<String, dynamic>>((ref) {
 });
 
 final connectionStatusProvider = Provider<bool>((ref) {
-  final sipService = ref.watch(sipServiceProvider);
-  return sipService.connected;
+  final registrationState = ref.watch(registrationStateProvider);
+  return registrationState.when(
+    data: (state) => state.state == RegistrationStateEnum.REGISTERED,
+    loading: () => false,
+    error: (error, stack) => false,
+  );
 });
 
 final isReconnectingProvider = Provider<bool>((ref) {

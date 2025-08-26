@@ -46,9 +46,25 @@ class SipService extends SipUaHelperListener {
   final StreamController<Call> _callStateController = StreamController<Call>.broadcast();
   final StreamController<String> _reconnectStatusController = StreamController<String>.broadcast();
 
-  Stream<RegistrationState> get registrationStream => _registrationStateController.stream;
+  Stream<RegistrationState> get registrationStream {
+    // Emit current state immediately for new subscribers
+    Future.microtask(() {
+      if (!_registrationStateController.isClosed) {
+        _registrationStateController.add(_registrationState);
+      }
+    });
+    return _registrationStateController.stream;
+  }
   Stream<Call> get callStream => _callStateController.stream;
-  Stream<String> get reconnectStatusStream => _reconnectStatusController.stream;
+  Stream<String> get reconnectStatusStream {
+    // Emit initial status for new subscribers
+    Future.microtask(() {
+      if (!_reconnectStatusController.isClosed) {
+        _reconnectStatusController.add(_connected ? 'Connected' : 'Disconnected');
+      }
+    });
+    return _reconnectStatusController.stream;
+  }
 
   RegistrationState get registrationState => _registrationState;
   bool get connected => _connected;

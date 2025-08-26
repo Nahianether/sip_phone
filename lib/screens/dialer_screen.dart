@@ -6,6 +6,7 @@ import '../providers/sip_providers.dart';
 import '../data/services/contacts_service.dart';
 import '../data/models/contact_model.dart';
 import '../utils/phone_utils.dart';
+import '../utils/transitions.dart';
 import 'call_history_screen.dart';
 import 'settings_menu_screen.dart';
 
@@ -267,29 +268,19 @@ class _DialerScreenState extends ConsumerState<DialerScreen>
               );
             },
           ),
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              switch (value) {
-                case 'settings':
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => SettingsMenuScreen()),
-                  );
-                  break;
-              }
+          IconButton(
+            icon: Icon(
+              Icons.settings_outlined,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            onPressed: () {
+              AppTransitions.navigateWithTransition(
+                context,
+                SettingsMenuScreen(),
+                type: TransitionType.slideFromRight,
+              );
             },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings_outlined, size: 20),
-                    SizedBox(width: 12),
-                    Text('Settings'),
-                  ],
-                ),
-              ),
-            ],
-            icon: Icon(Icons.more_vert),
+            tooltip: 'Settings',
           ),
         ],
         bottom: TabBar(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/theme_provider.dart';
+import '../models/theme_model.dart' as theme_model;
 import 'settings_screen.dart';
 
 class SettingsMenuScreen extends ConsumerWidget {
@@ -58,6 +60,10 @@ class SettingsMenuScreen extends ConsumerWidget {
                         );
                       },
                     ),
+                    
+                    SizedBox(height: 12),
+                    
+                    _buildThemeCard(context: context, ref: ref),
                     
                     SizedBox(height: 12),
                     
@@ -130,6 +136,169 @@ class SettingsMenuScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeCard({
+    required BuildContext context,
+    required WidgetRef ref,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final currentTheme = ref.watch(themeProvider);
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outline.withValues(alpha: 0.2),
+          width: 0.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.palette_outlined,
+                    color: colorScheme.primary,
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Theme',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'Choose your preferred theme',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildThemeOption(
+                    context: context,
+                    ref: ref,
+                    themeMode: theme_model.ThemeMode.light,
+                    currentTheme: currentTheme,
+                    icon: Icons.light_mode_outlined,
+                    label: 'Light',
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _buildThemeOption(
+                    context: context,
+                    ref: ref,
+                    themeMode: theme_model.ThemeMode.dark,
+                    currentTheme: currentTheme,
+                    icon: Icons.dark_mode_outlined,
+                    label: 'Dark',
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: _buildThemeOption(
+                    context: context,
+                    ref: ref,
+                    themeMode: theme_model.ThemeMode.system,
+                    currentTheme: currentTheme,
+                    icon: Icons.brightness_auto_outlined,
+                    label: 'System',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOption({
+    required BuildContext context,
+    required WidgetRef ref,
+    required theme_model.ThemeMode themeMode,
+    required theme_model.ThemeMode currentTheme,
+    required IconData icon,
+    required String label,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isSelected = currentTheme == themeMode;
+    
+    return GestureDetector(
+      onTap: () {
+        ref.read(themeProvider.notifier).setTheme(themeMode);
+      },
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? colorScheme.primary.withValues(alpha: 0.1)
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected 
+                ? colorScheme.primary
+                : colorScheme.outline.withValues(alpha: 0.2),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected 
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+            SizedBox(height: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: isSelected 
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
         ),
       ),
     );

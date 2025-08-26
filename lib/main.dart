@@ -11,6 +11,7 @@ import 'services/permission_service.dart';
 import 'services/storage_service.dart';
 import 'services/sip_service.dart';
 import 'theme/app_theme.dart';
+import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,15 +19,19 @@ void main() async {
   runApp(const ProviderScope(child: SipPhoneApp()));
 }
 
-class SipPhoneApp extends StatelessWidget {
+class SipPhoneApp extends ConsumerWidget {
   const SipPhoneApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDarkMode = ref.watch(isDarkModeProvider);
+    
     return MaterialApp(
       title: 'SIP Phone',
       navigatorKey: NavigationService.navigatorKey,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: const PermissionWrapper(),
       routes: {
         '/home': (context) => const HomeScreen(),

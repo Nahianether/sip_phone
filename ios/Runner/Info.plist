@@ -51,5 +51,9 @@
 			<string>remote-notification</string>
 			<string>processing</string>			<!-- you can add this if needed -->
 		</array>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>This app needs access to microphone to make voice calls</string>
+		<key>NSContactsUsageDescription</key>
+		<string>This app needs access to contacts to display your contacts and make calls</string>
 	</dict>
 </plist>

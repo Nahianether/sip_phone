@@ -4,7 +4,6 @@ import 'package:sip_ua/sip_ua.dart';
 import '../providers/sip_providers.dart';
 import 'dialer_screen.dart';
 import 'active_call_screen.dart';
-import 'websocket_test_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});

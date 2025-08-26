@@ -443,13 +443,13 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
                         const SizedBox(width: 8),
                         Container(
                           decoration: BoxDecoration(
-                            color: colorScheme.errorContainer,
+                            color: Colors.red,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: IconButton(
                             icon: Icon(
-                              Icons.delete_outline_rounded,
-                              color: colorScheme.error,
+                              Icons.delete,
+                              color: Colors.white,
                               size: 20,
                             ),
                             onPressed: () async {

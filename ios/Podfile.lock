@@ -1,49 +1,76 @@
 PODS:
-  - Flutter (1.0.0)
-  - flutter_webrtc (0.9.36):
+  - audioplayers_darwin (0.0.1):
     - Flutter
-    - WebRTC-SDK (= 114.5735.08)
+  - CryptoSwift (1.8.4)
+  - device_info_plus (0.0.1):
+    - Flutter
+  - Flutter (1.0.0)
+  - flutter_callkit_incoming (0.0.1):
+    - CryptoSwift
+    - Flutter
+  - flutter_contacts (0.0.1):
+    - Flutter
+  - flutter_webrtc (0.12.6):
+    - Flutter
+    - WebRTC-SDK (= 125.6422.06)
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
   - permission_handler_apple (9.3.0):
     - Flutter
-  - shared_preferences_foundation (0.0.1):
+  - url_launcher_ios (0.0.1):
     - Flutter
-    - FlutterMacOS
-  - WebRTC-SDK (114.5735.08)
+  - WebRTC-SDK (125.6422.06)
 
 DEPENDENCIES:
+  - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/ios`)
+  - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - Flutter (from `Flutter`)
+  - flutter_callkit_incoming (from `.symlinks/plugins/flutter_callkit_incoming/ios`)
+  - flutter_contacts (from `.symlinks/plugins/flutter_contacts/ios`)
   - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
-  - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
+  - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
 SPEC REPOS:
   trunk:
+    - CryptoSwift
     - WebRTC-SDK
 
 EXTERNAL SOURCES:
+  audioplayers_darwin:
+    :path: ".symlinks/plugins/audioplayers_darwin/ios"
+  device_info_plus:
+    :path: ".symlinks/plugins/device_info_plus/ios"
   Flutter:
     :path: Flutter
+  flutter_callkit_incoming:
+    :path: ".symlinks/plugins/flutter_callkit_incoming/ios"
+  flutter_contacts:
+    :path: ".symlinks/plugins/flutter_contacts/ios"
   flutter_webrtc:
     :path: ".symlinks/plugins/flutter_webrtc/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
-  shared_preferences_foundation:
-    :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+  url_launcher_ios:
+    :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
+  audioplayers_darwin: 877d9a4d06331c5c374595e46e16453ac7eafa40
+  CryptoSwift: e64e11850ede528a02a0f3e768cec8e9d92ecb90
+  device_info_plus: c6fb39579d0f423935b0c9ce7ee2f44b71b9fce6
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
-  flutter_webrtc: 55df3aaa802114dad390191a46c2c8d535751268
+  flutter_callkit_incoming: 417dd1b46541cdd5d855ad795ccbe97d1c18155e
+  flutter_contacts: edb1c5ce76aa433e20e6cb14c615f4c0b66e0983
+  flutter_webrtc: 90260f83024b1b96d239a575ea4e3708e79344d1
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
   permission_handler_apple: 9878588469a2b0d0fc1e048d9f43605f92e6cec2
-  shared_preferences_foundation: fcdcbc04712aee1108ac7fda236f363274528f78
-  WebRTC-SDK: c24d2a6c9f571f2ed42297cb8ffba9557093142b
+  url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
+  WebRTC-SDK: 79942c006ea64f6fb48d7da8a4786dfc820bc1db
 
-PODFILE CHECKSUM: 4305caec6b40dde0ae97be1573c53de1882a07e5
+PODFILE CHECKSUM: 251cb053df7158f337c0712f2ab29f4e0fa474ce
 
 COCOAPODS: 1.16.2

@@ -1,44 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../services/sip_service.dart';
+import '../providers/sip_providers.dart';
 
-class DialerScreen extends StatefulWidget {
+final phoneNumberProvider = StateProvider<String>((ref) => '');
+
+class DialerScreen extends ConsumerWidget {
   const DialerScreen({super.key});
 
-  @override
-  State<DialerScreen> createState() => _DialerScreenState();
-}
-
-class _DialerScreenState extends State<DialerScreen> {
-  final SipService _sipService = SipService();
-  String _phoneNumber = '';
-
-  void _addDigit(String digit) {
-    setState(() {
-      _phoneNumber += digit;
-    });
+  void _addDigit(WidgetRef ref, String digit) {
+    final currentNumber = ref.read(phoneNumberProvider);
+    ref.read(phoneNumberProvider.notifier).state = currentNumber + digit;
   }
 
-  void _removeDigit() {
-    setState(() {
-      if (_phoneNumber.isNotEmpty) {
-        _phoneNumber = _phoneNumber.substring(0, _phoneNumber.length - 1);
-      }
-    });
+  void _removeDigit(WidgetRef ref) {
+    final currentNumber = ref.read(phoneNumberProvider);
+    if (currentNumber.isNotEmpty) {
+      ref.read(phoneNumberProvider.notifier).state = 
+          currentNumber.substring(0, currentNumber.length - 1);
+    }
   }
 
-  void _clearNumber() {
-    setState(() {
-      _phoneNumber = '';
-    });
+  void _clearNumber(WidgetRef ref) {
+    ref.read(phoneNumberProvider.notifier).state = '';
   }
 
-  Future<void> _makeCall() async {
-    // Request microphone permission
+  Future<void> _makeCall(WidgetRef ref, BuildContext context) async {
+    final phoneNumber = ref.read(phoneNumberProvider);
+    final sipService = ref.read(sipServiceProvider);
+    
     if (await Permission.microphone.isDenied) {
       final status = await Permission.microphone.request();
       if (status.isDenied) {
-        if (mounted) {
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Microphone permission is required for calls'),
@@ -50,13 +44,12 @@ class _DialerScreenState extends State<DialerScreen> {
       }
     }
     
-    if (_phoneNumber.isNotEmpty && _sipService.connected) {
-      final success = await _sipService.makeCall(_phoneNumber);
+    if (phoneNumber.isNotEmpty && sipService.connected) {
+      final success = await sipService.makeCall(phoneNumber);
       if (success) {
-        _clearNumber();
-        // Navigation is now handled by SIP service
+        _clearNumber(ref);
       } else {
-        if (mounted) {
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Failed to make call. Please check your connection.'),
@@ -65,8 +58,8 @@ class _DialerScreenState extends State<DialerScreen> {
           );
         }
       }
-    } else if (!_sipService.connected) {
-      if (mounted) {
+    } else if (!sipService.connected) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Not connected to SIP server. Please check settings.'),
@@ -116,7 +109,10 @@ class _DialerScreenState extends State<DialerScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final phoneNumber = ref.watch(phoneNumberProvider);
+    final sipService = ref.watch(sipServiceProvider);
+    
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -131,10 +127,10 @@ class _DialerScreenState extends State<DialerScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                _phoneNumber.isEmpty ? 'Enter phone number' : _phoneNumber,
+                phoneNumber.isEmpty ? 'Enter phone number' : phoneNumber,
                 style: TextStyle(
                   fontSize: 20,
-                  color: _phoneNumber.isEmpty ? Colors.grey : Colors.black,
+                  color: phoneNumber.isEmpty ? Colors.grey : Colors.black,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -149,86 +145,86 @@ class _DialerScreenState extends State<DialerScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildDialButton(
-                      number: '1',
-                      letters: '',
-                      onPressed: () => _addDigit('1'),
-                    ),
-                    _buildDialButton(
-                      number: '2',
-                      letters: 'ABC',
-                      onPressed: () => _addDigit('2'),
-                    ),
-                    _buildDialButton(
-                      number: '3',
-                      letters: 'DEF',
-                      onPressed: () => _addDigit('3'),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildDialButton(
-                      number: '4',
-                      letters: 'GHI',
-                      onPressed: () => _addDigit('4'),
-                    ),
-                    _buildDialButton(
-                      number: '5',
-                      letters: 'JKL',
-                      onPressed: () => _addDigit('5'),
-                    ),
-                    _buildDialButton(
-                      number: '6',
-                      letters: 'MNO',
-                      onPressed: () => _addDigit('6'),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildDialButton(
-                      number: '7',
-                      letters: 'PQRS',
-                      onPressed: () => _addDigit('7'),
-                    ),
-                    _buildDialButton(
-                      number: '8',
-                      letters: 'TUV',
-                      onPressed: () => _addDigit('8'),
-                    ),
-                    _buildDialButton(
-                      number: '9',
-                      letters: 'WXYZ',
-                      onPressed: () => _addDigit('9'),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildDialButton(
-                      number: '*',
-                      letters: '',
-                      onPressed: () => _addDigit('*'),
-                    ),
-                    _buildDialButton(
-                      number: '0',
-                      letters: '+',
-                      onPressed: () => _addDigit('0'),
-                    ),
-                    _buildDialButton(
-                      number: '#',
-                      letters: '',
-                      onPressed: () => _addDigit('#'),
-                    ),
-                  ],
-                ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildDialButton(
+                                number: '1',
+                                letters: '',
+                                onPressed: () => _addDigit(ref, '1'),
+                              ),
+                              _buildDialButton(
+                                number: '2',
+                                letters: 'ABC',
+                                onPressed: () => _addDigit(ref, '2'),
+                              ),
+                              _buildDialButton(
+                                number: '3',
+                                letters: 'DEF',
+                                onPressed: () => _addDigit(ref, '3'),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildDialButton(
+                                number: '4',
+                                letters: 'GHI',
+                                onPressed: () => _addDigit(ref, '4'),
+                              ),
+                              _buildDialButton(
+                                number: '5',
+                                letters: 'JKL',
+                                onPressed: () => _addDigit(ref, '5'),
+                              ),
+                              _buildDialButton(
+                                number: '6',
+                                letters: 'MNO',
+                                onPressed: () => _addDigit(ref, '6'),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildDialButton(
+                                number: '7',
+                                letters: 'PQRS',
+                                onPressed: () => _addDigit(ref, '7'),
+                              ),
+                              _buildDialButton(
+                                number: '8',
+                                letters: 'TUV',
+                                onPressed: () => _addDigit(ref, '8'),
+                              ),
+                              _buildDialButton(
+                                number: '9',
+                                letters: 'WXYZ',
+                                onPressed: () => _addDigit(ref, '9'),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildDialButton(
+                                number: '*',
+                                letters: '',
+                                onPressed: () => _addDigit(ref, '*'),
+                              ),
+                              _buildDialButton(
+                                number: '0',
+                                letters: '+',
+                                onPressed: () => _addDigit(ref, '0'),
+                              ),
+                              _buildDialButton(
+                                number: '#',
+                                letters: '',
+                                onPressed: () => _addDigit(ref, '#'),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -242,19 +238,21 @@ class _DialerScreenState extends State<DialerScreen> {
               children: [
                 FloatingActionButton(
                   heroTag: "backspace_btn",
-                  onPressed: _phoneNumber.isNotEmpty ? _removeDigit : null,
+                  onPressed: phoneNumber.isNotEmpty ? () => _removeDigit(ref) : null,
                   backgroundColor: Colors.grey.shade300,
                   child: const Icon(Icons.backspace, color: Colors.black),
                 ),
                 FloatingActionButton(
                   heroTag: "call_btn",
-                  onPressed: _phoneNumber.isNotEmpty && _sipService.connected ? _makeCall : null,
+                  onPressed: phoneNumber.isNotEmpty && sipService.connected 
+                      ? () => _makeCall(ref, context) 
+                      : null,
                   backgroundColor: Colors.green,
                   child: const Icon(Icons.call, color: Colors.white),
                 ),
                 FloatingActionButton(
                   heroTag: "clear_btn",
-                  onPressed: _phoneNumber.isNotEmpty ? _clearNumber : null,
+                  onPressed: phoneNumber.isNotEmpty ? () => _clearNumber(ref) : null,
                   backgroundColor: Colors.red.shade300,
                   child: const Icon(Icons.clear, color: Colors.white),
                 ),

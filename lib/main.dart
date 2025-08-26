@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'screens/home_screen.dart';
@@ -7,7 +8,7 @@ import 'screens/incoming_call_screen.dart';
 import 'services/navigation_service.dart';
 
 void main() {
-  runApp(const SipPhoneApp());
+  runApp(const ProviderScope(child: SipPhoneApp()));
 }
 
 class SipPhoneApp extends StatelessWidget {
@@ -38,14 +39,14 @@ class SipPhoneApp extends StatelessWidget {
   }
 }
 
-class PermissionWrapper extends StatefulWidget {
+class PermissionWrapper extends ConsumerStatefulWidget {
   const PermissionWrapper({super.key});
 
   @override
-  State<PermissionWrapper> createState() => _PermissionWrapperState();
+  ConsumerState<PermissionWrapper> createState() => _PermissionWrapperState();
 }
 
-class _PermissionWrapperState extends State<PermissionWrapper> {
+class _PermissionWrapperState extends ConsumerState<PermissionWrapper> {
   @override
   void initState() {
     super.initState();

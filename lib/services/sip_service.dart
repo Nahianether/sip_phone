@@ -24,10 +24,12 @@ class SipService extends SipUaHelperListener {
 
   // Reconnection parameters
   int _reconnectAttempts = 0;
-  final int _maxReconnectAttempts = 5;
-  final List<int> _reconnectDelays = [2, 5, 10, 20, 30]; // seconds
-  Timer? _reconnectTimer;
-  Timer? _heartbeatTimer;
+  final int _maxReconnectAttempts = 10;
+  final List<int> _reconnectDelays = [1, 2, 5, 10, 15, 20, 30, 45, 60, 90]; // seconds
+  
+  // Connection health monitoring
+  DateTime? _lastSuccessfulConnection;
+  int _connectionFailures = 0;
 
   // Navigation service
   final NavigationService _navigationService = NavigationService();
@@ -54,9 +56,15 @@ class SipService extends SipUaHelperListener {
     bool saveCredentials = true,
   }) async {
     try {
-      // Validate input parameters
+      // Enhanced parameter validation
       if (username.isEmpty || password.isEmpty || server.isEmpty || wsUrl.isEmpty) {
         _reconnectStatusController.add('Invalid connection parameters');
+        return false;
+      }
+
+      // Validate WebSocket URL format
+      if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+        _reconnectStatusController.add('Invalid WebSocket URL format');
         return false;
       }
 
@@ -67,15 +75,17 @@ class SipService extends SipUaHelperListener {
       _lastWsUrl = wsUrl;
       _lastDisplayName = displayName ?? username;
 
-      // Disconnect existing connection if any
+      // Graceful disconnect of existing connection
       if (_helper != null) {
         try {
           _helper!.stop();
+          _reconnectStatusController.add('Disconnecting previous session...');
         } catch (e) {
-          // Ignore errors during cleanup
+          debugPrint('Error during cleanup: $e');
         }
         _helper = null;
-        await Future.delayed(const Duration(milliseconds: 500)); // Allow cleanup
+        // Longer delay to ensure proper cleanup
+        await Future.delayed(const Duration(milliseconds: 1000));
       }
 
       _helper = SIPUAHelper();
@@ -86,24 +96,25 @@ class SipService extends SipUaHelperListener {
       settings.authorizationUser = username;
       settings.password = password;
       settings.displayName = displayName?.isNotEmpty == true ? displayName : username;
-      settings.userAgent = 'SIP Phone Flutter';
+      settings.userAgent = 'SIP Phone Flutter v1.0';
       settings.dtmfMode = DtmfMode.RFC2833;
-
-      // Set the transport type - this was missing!
       settings.transportType = TransportType.WS;
 
-      // Additional settings for stability
+      // Enhanced stability settings
       settings.register = true;
       settings.sessionTimers = true;
       settings.iceGatheringTimeout = 30000;
 
-      // WebRTC audio configuration
+      // Enhanced WebRTC configuration for better connectivity
       settings.iceServers = [
         {'url': 'stun:stun.l.google.com:19302'},
         {'url': 'stun:stun1.l.google.com:19302'},
+        {'url': 'stun:stun2.l.google.com:19302'},
+        {'url': 'stun:stun3.l.google.com:19302'},
+        {'url': 'stun:stun4.l.google.com:19302'},
       ];
 
-      // Validate critical settings before starting
+      // Final validation
       if (settings.webSocketUrl == null || settings.uri == null || settings.transportType == null) {
         _reconnectStatusController.add('Invalid SIP settings configuration');
         return false;
@@ -111,10 +122,23 @@ class SipService extends SipUaHelperListener {
 
       _helper!.addSipUaHelperListener(this);
 
-      // Add null check and error handling for start
+      // Enhanced error handling for connection start
       try {
         _helper!.start(settings);
-        _reconnectStatusController.add('Connecting to SIP server...');
+        _reconnectStatusController.add('Initializing SIP connection...');
+        
+        // Add connection timeout mechanism
+        bool connectionEstablished = false;
+        Timer(const Duration(seconds: 15), () {
+          if (!connectionEstablished && !_connected) {
+            _reconnectStatusController.add('Connection timeout - retrying...');
+            if (_autoReconnectEnabled && !_isReconnecting) {
+              Future.microtask(() => _attemptReconnectImmediate());
+            }
+          }
+        });
+
+        connectionEstablished = true;
       } catch (startError) {
         _reconnectStatusController.add('Failed to start SIP connection: $startError');
         _helper = null;
@@ -125,82 +149,102 @@ class SipService extends SipUaHelperListener {
         await _saveCredentials(username, password, server, wsUrl, displayName);
       }
 
-      // Reset reconnection attempts on successful connection
+      // Reset reconnection attempts on successful connection initiation
       _reconnectAttempts = 0;
-      _cancelReconnectTimer();
       _isReconnecting = false;
 
       return true;
     } catch (e) {
-      _reconnectStatusController.add('Connection error: $e');
+      _reconnectStatusController.add('Connection error: ${e.toString()}');
       _helper = null;
 
+      // Trigger reconnection if enabled
       if (_autoReconnectEnabled && !_isReconnecting) {
-        _scheduleReconnect();
+        Future.microtask(() => _attemptReconnectImmediate());
       }
       return false;
     }
   }
 
-  Future<void> _attemptReconnect() async {
+  Future<void> _attemptReconnectImmediate() async {
+    if (!_autoReconnectEnabled || _isReconnecting) return;
     if (_lastUsername == null || _lastPassword == null || _lastServer == null || _lastWsUrl == null) {
       return;
     }
 
-    _reconnectAttempts++;
-    _reconnectStatusController.add('Reconnecting... ($_reconnectAttempts/$_maxReconnectAttempts)');
-
-    final success = await connect(
-      username: _lastUsername!,
-      password: _lastPassword!,
-      server: _lastServer!,
-      wsUrl: _lastWsUrl!,
-      displayName: _lastDisplayName,
-      saveCredentials: false,
-    );
-
-    if (success) {
-      _isReconnecting = false;
-      _reconnectStatusController.add('Reconnected successfully');
-    } else if (_reconnectAttempts >= _maxReconnectAttempts) {
-      _isReconnecting = false;
-      _reconnectStatusController.add('Failed to reconnect after $_maxReconnectAttempts attempts');
-    } else {
-      _scheduleReconnect();
-    }
-  }
-
-  void _scheduleReconnect() {
-    if (!_autoReconnectEnabled || _isReconnecting) return;
-
     _isReconnecting = true;
-    final delayIndex = (_reconnectAttempts < _reconnectDelays.length)
-        ? _reconnectAttempts
+    _reconnectAttempts++;
+    _reconnectStatusController.add('Attempting reconnection... ($_reconnectAttempts/$_maxReconnectAttempts)');
+
+    // Wait for a delay before attempting reconnection
+    final delayIndex = (_reconnectAttempts - 1 < _reconnectDelays.length)
+        ? _reconnectAttempts - 1
         : _reconnectDelays.length - 1;
     final delay = _reconnectDelays[delayIndex];
-
+    
     _reconnectStatusController.add('Reconnecting in $delay seconds...');
+    await Future.delayed(Duration(seconds: delay));
 
-    _reconnectTimer = Timer(Duration(seconds: delay), () {
-      _attemptReconnect();
-    });
-  }
+    if (_reconnectAttempts > _maxReconnectAttempts) {
+      _isReconnecting = false;
+      _reconnectStatusController.add('Max reconnection attempts reached');
+      return;
+    }
 
-  void _cancelReconnectTimer() {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
+    try {
+      final success = await connect(
+        username: _lastUsername!,
+        password: _lastPassword!,
+        server: _lastServer!,
+        wsUrl: _lastWsUrl!,
+        displayName: _lastDisplayName,
+        saveCredentials: false,
+      );
+
+      if (success) {
+        _reconnectStatusController.add('Reconnected successfully');
+        _reconnectAttempts = 0; // Reset attempts on successful connection
+        _isReconnecting = false;
+      } else if (_reconnectAttempts < _maxReconnectAttempts) {
+        // Schedule another attempt
+        _reconnectStatusController.add('Reconnection attempt failed, retrying...');
+        Future.microtask(() => _attemptReconnectImmediate());
+      } else {
+        _isReconnecting = false;
+        _reconnectStatusController.add('Failed to reconnect after $_maxReconnectAttempts attempts');
+      }
+    } catch (e) {
+      if (_reconnectAttempts < _maxReconnectAttempts) {
+        _reconnectStatusController.add('Reconnection error: $e, retrying...');
+        Future.microtask(() => _attemptReconnectImmediate());
+      } else {
+        _isReconnecting = false;
+        _reconnectStatusController.add('Failed to reconnect: $e');
+      }
+    }
   }
 
   void enableAutoReconnect(bool enabled) {
     _autoReconnectEnabled = enabled;
     if (!enabled) {
-      _cancelReconnectTimer();
       _isReconnecting = false;
     }
   }
 
+  // Get connection health information
+  Map<String, dynamic> getConnectionHealth() {
+    return {
+      'connected': _connected,
+      'isReconnecting': _isReconnecting,
+      'reconnectAttempts': _reconnectAttempts,
+      'maxReconnectAttempts': _maxReconnectAttempts,
+      'connectionFailures': _connectionFailures,
+      'lastSuccessfulConnection': _lastSuccessfulConnection?.toIso8601String(),
+      'autoReconnectEnabled': _autoReconnectEnabled,
+    };
+  }
+
   Future<void> disconnect() async {
-    _cancelReconnectTimer();
     _isReconnecting = false;
 
     if (_helper != null) {
@@ -336,17 +380,38 @@ class SipService extends SipUaHelperListener {
     _connected = state.state == RegistrationStateEnum.REGISTERED;
     _registrationStateController.add(state);
 
+    // Update connection health
+    if (_connected) {
+      _lastSuccessfulConnection = DateTime.now();
+      _connectionFailures = 0;
+      _reconnectAttempts = 0;
+      _reconnectStatusController.add('Successfully registered to SIP server');
+    } else if (wasConnected) {
+      _connectionFailures++;
+    }
+
     // Trigger reconnection on registration failure or unregistered state
     if (wasConnected && !_connected && _autoReconnectEnabled && !_isReconnecting) {
-      _scheduleReconnect();
+      _reconnectStatusController.add('Connection lost, attempting to reconnect...');
+      Future.microtask(() => _attemptReconnectImmediate());
     }
   }
 
   @override
   void transportStateChanged(TransportState state) {
+    debugPrint('🔥 DEBUG: transportStateChanged called - State: ${state.state}');
+    
     // Handle transport disconnection
-    if (state.state == TransportStateEnum.DISCONNECTED && _connected && _autoReconnectEnabled && !_isReconnecting) {
-      _scheduleReconnect();
+    if (state.state == TransportStateEnum.DISCONNECTED) {
+      _connectionFailures++;
+      _reconnectStatusController.add('Transport disconnected');
+      
+      if (_connected && _autoReconnectEnabled && !_isReconnecting) {
+        _reconnectStatusController.add('Transport lost, attempting to reconnect...');
+        Future.microtask(() => _attemptReconnectImmediate());
+      }
+    } else if (state.state == TransportStateEnum.CONNECTED) {
+      _reconnectStatusController.add('Transport connected successfully');
     }
   }
 
@@ -365,7 +430,7 @@ class SipService extends SipUaHelperListener {
           Future.delayed(Duration(milliseconds: 100), () {
             // Direct navigation using Navigator instead of NavigationService
             final context = NavigationService.navigatorKey.currentContext;
-            if (context != null) {
+            if (context != null && context.mounted) {
               Navigator.pushNamed(context, '/active_call', arguments: call);
               debugPrint('🔥 DEBUG: Direct navigation to /active_call successful');
             } else {
@@ -393,10 +458,10 @@ class SipService extends SipUaHelperListener {
         // Navigate to active call screen for confirmed calls if not already there
         Future.delayed(Duration(milliseconds: 100), () {
           final context = NavigationService.navigatorKey.currentContext;
-          if (context != null) {
+          if (context != null && context.mounted) {
             // For incoming calls, replace the incoming call screen with active call screen
             // For outgoing calls, navigate normally (might already be on active call screen)
-            if (call.direction?.toLowerCase() == 'incoming') {
+            if (call.direction.toLowerCase() == 'incoming') {
               Navigator.pushReplacementNamed(context, '/active_call', arguments: call);
               debugPrint('🔥 DEBUG: CONFIRMED incoming call - replaced with active call screen');
             } else {
@@ -461,7 +526,7 @@ class SipService extends SipUaHelperListener {
 
     Future.delayed(Duration(milliseconds: 100), () {
       final context = NavigationService.navigatorKey.currentContext;
-      if (context != null) {
+      if (context != null && context.mounted) {
         Navigator.pushNamed(context, '/incoming_call', arguments: call);
         debugPrint('🔥 DEBUG: Incoming call navigation successful');
       } else {
@@ -481,8 +546,6 @@ class SipService extends SipUaHelperListener {
   }
 
   void dispose() {
-    _cancelReconnectTimer();
-    _heartbeatTimer?.cancel();
     _registrationStateController.close();
     _callStateController.close();
     _reconnectStatusController.close();

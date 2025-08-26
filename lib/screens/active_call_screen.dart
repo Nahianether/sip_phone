@@ -1,69 +1,74 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_ua/sip_ua.dart';
-import '../services/sip_service.dart';
+import '../providers/sip_providers.dart';
+import '../providers/call_providers.dart';
 
-class ActiveCallScreen extends StatefulWidget {
+final callStartTimeProvider = StateProvider<DateTime?>((ref) => null);
+
+class ActiveCallScreen extends ConsumerStatefulWidget {
   final Call call;
 
   const ActiveCallScreen({super.key, required this.call});
 
   @override
-  State<ActiveCallScreen> createState() => _ActiveCallScreenState();
+  ConsumerState<ActiveCallScreen> createState() => _ActiveCallScreenState();
 }
 
-class _ActiveCallScreenState extends State<ActiveCallScreen> {
-  final SipService _sipService = SipService();
-  bool _isMuted = false;
-  bool _isSpeakerOn = false;
-  bool _isHeld = false;
-  String _callDuration = '00:00';
-  DateTime? _callStartTime;
-  String _callStatus = 'Connecting...';
-  late Stream<Call> _callStateStream;
+class _ActiveCallScreenState extends ConsumerState<ActiveCallScreen> {
+  Timer? _callTimer;
 
   @override
   void initState() {
     super.initState();
-    _callStateStream = _sipService.callStream;
-    _listenToCallStates();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _listenToCallStates();
+    });
+  }
+
+  @override
+  void dispose() {
+    _callTimer?.cancel();
+    super.dispose();
   }
 
   void _listenToCallStates() {
-    _callStateStream.listen((call) {
-      if (call.id == widget.call.id) {
-        setState(() {
+    ref.listen<AsyncValue<Call>>(callStateProvider, (previous, next) {
+      next.whenData((call) {
+        if (call.id == widget.call.id) {
           switch (call.state) {
             case CallStateEnum.CONNECTING:
-              _callStatus = 'Connecting...';
+              ref.read(callStatusProvider.notifier).state = 'Connecting...';
               break;
             case CallStateEnum.PROGRESS:
-              _callStatus = 'Ringing...';
+              ref.read(callStatusProvider.notifier).state = 'Ringing...';
               break;
             case CallStateEnum.ACCEPTED:
-              _callStatus = 'Call accepted';
+              ref.read(callStatusProvider.notifier).state = 'Call accepted';
               break;
             case CallStateEnum.CONFIRMED:
-              _callStatus = 'Connected';
-              if (_callStartTime == null) {
-                _callStartTime = DateTime.now();
+              ref.read(callStatusProvider.notifier).state = 'Connected';
+              final startTime = ref.read(callStartTimeProvider);
+              if (startTime == null) {
+                ref.read(callStartTimeProvider.notifier).state = DateTime.now();
                 _startCallTimer();
               }
               break;
             default:
               break;
           }
-        });
-      }
+        }
+      });
     });
   }
 
   void _startCallTimer() {
-    Stream.periodic(const Duration(seconds: 1), (i) => i).listen((_) {
-      if (_callStartTime != null) {
-        final duration = DateTime.now().difference(_callStartTime!);
-        setState(() {
-          _callDuration = _formatDuration(duration);
-        });
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final startTime = ref.read(callStartTimeProvider);
+      if (startTime != null) {
+        final duration = DateTime.now().difference(startTime);
+        ref.read(callDurationProvider.notifier).state = _formatDuration(duration);
       }
     });
   }
@@ -76,31 +81,31 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
   }
 
   void _hangup() {
-    _sipService.hangup(widget.call);
+    final sipService = ref.read(sipServiceProvider);
+    sipService.hangup(widget.call);
     Navigator.pop(context);
   }
 
   void _toggleMute() {
-    setState(() {
-      _isMuted = !_isMuted;
-    });
+    final currentMuted = ref.read(isMutedProvider);
+    ref.read(isMutedProvider.notifier).state = !currentMuted;
   }
 
   void _toggleSpeaker() {
-    setState(() {
-      _isSpeakerOn = !_isSpeakerOn;
-    });
+    final currentSpeaker = ref.read(isSpeakerOnProvider);
+    ref.read(isSpeakerOnProvider.notifier).state = !currentSpeaker;
   }
 
   void _toggleHold() {
-    if (_isHeld) {
-      _sipService.unhold(widget.call);
+    final sipService = ref.read(sipServiceProvider);
+    final currentHeld = ref.read(isHeldProvider);
+    
+    if (currentHeld) {
+      sipService.unhold(widget.call);
     } else {
-      _sipService.hold(widget.call);
+      sipService.hold(widget.call);
     }
-    setState(() {
-      _isHeld = !_isHeld;
-    });
+    ref.read(isHeldProvider.notifier).state = !currentHeld;
   }
 
   void _showDTMFPad() {
@@ -161,7 +166,8 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
   Widget _buildDTMFButton(String digit) {
     return ElevatedButton(
       onPressed: () {
-        _sipService.sendDTMF(widget.call, digit);
+        final sipService = ref.read(sipServiceProvider);
+        sipService.sendDTMF(widget.call, digit);
       },
       style: ElevatedButton.styleFrom(
         shape: const CircleBorder(),
@@ -202,6 +208,12 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
   @override
   Widget build(BuildContext context) {
     final remoteIdentity = widget.call.remote_identity?.toString() ?? 'Unknown';
+    final isMuted = ref.watch(isMutedProvider);
+    final isSpeakerOn = ref.watch(isSpeakerOnProvider);
+    final isHeld = ref.watch(isHeldProvider);
+    final callDuration = ref.watch(callDurationProvider);
+    final callStatus = ref.watch(callStatusProvider);
+    final callStartTime = ref.watch(callStartTimeProvider);
     
     return Scaffold(
       backgroundColor: Colors.black87,
@@ -228,7 +240,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                _isHeld ? 'Call On Hold' : (_callStartTime != null ? _callDuration : _callStatus),
+                isHeld ? 'Call On Hold' : (callStartTime != null ? callDuration : callStatus),
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 18,
@@ -241,10 +253,10 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                   GestureDetector(
                     onTap: _toggleMute,
                     child: _buildCallButton(
-                      icon: _isMuted ? Icons.mic_off : Icons.mic,
-                      label: _isMuted ? 'Unmute' : 'Mute',
+                      icon: isMuted ? Icons.mic_off : Icons.mic,
+                      label: isMuted ? 'Unmute' : 'Mute',
                       onPressed: _toggleMute,
-                      isActive: _isMuted,
+                      isActive: isMuted,
                       activeColor: Colors.orange,
                     ),
                   ),
@@ -259,10 +271,10 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                   GestureDetector(
                     onTap: _toggleSpeaker,
                     child: _buildCallButton(
-                      icon: _isSpeakerOn ? Icons.volume_up : Icons.volume_down,
+                      icon: isSpeakerOn ? Icons.volume_up : Icons.volume_down,
                       label: 'Speaker',
                       onPressed: _toggleSpeaker,
-                      isActive: _isSpeakerOn,
+                      isActive: isSpeakerOn,
                       activeColor: Colors.blue,
                     ),
                   ),
@@ -275,10 +287,10 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                   GestureDetector(
                     onTap: _toggleHold,
                     child: _buildCallButton(
-                      icon: _isHeld ? Icons.play_arrow : Icons.pause,
-                      label: _isHeld ? 'Resume' : 'Hold',
+                      icon: isHeld ? Icons.play_arrow : Icons.pause,
+                      label: isHeld ? 'Resume' : 'Hold',
                       onPressed: _toggleHold,
-                      isActive: _isHeld,
+                      isActive: isHeld,
                       activeColor: Colors.purple,
                     ),
                   ),

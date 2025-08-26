@@ -1,44 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_ua/sip_ua.dart';
-import '../services/sip_service.dart';
-import '../services/call_manager.dart';
+import '../providers/sip_providers.dart';
 import 'dialer_screen.dart';
 import 'settings_screen.dart';
 import 'active_call_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+final currentIndexProvider = StateProvider<int>((ref) => 0);
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final SipService _sipService = SipService();
-  final CallManager _callManager = CallManager();
-  int _currentIndex = 0;
-
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _sipService.callStream.listen(_handleCall);
-    _attemptAutoConnect();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _attemptAutoConnect();
+      _listenToCallStream();
+    });
+  }
+
+  void _listenToCallStream() {
+    ref.listen<AsyncValue<Call>>(callStateProvider, (previous, next) {
+      next.whenData((call) {
+        final callManager = ref.read(callManagerProvider);
+        callManager.addCall(call);
+        
+        if (call.direction == 'incoming') {
+          _showIncomingCallDialog(call);
+        }
+      });
+    });
   }
 
   Future<void> _attemptAutoConnect() async {
-    final credentials = await _sipService.getSavedCredentials();
+    final sipService = ref.read(sipServiceProvider);
+    final credentials = await sipService.getSavedCredentials();
     if (credentials['username'] != null && 
         credentials['password'] != null && 
         credentials['server'] != null &&
         credentials['wsUrl'] != null) {
       
-      // Extract server from SIP URI if needed
       String server = credentials['server']!;
       if (credentials['username']!.contains('@')) {
         server = credentials['username']!.split('@')[1];
       }
       
-      await _sipService.connect(
+      await sipService.connect(
         username: credentials['username']!,
         password: credentials['password']!,
         server: server,
@@ -49,15 +62,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _handleCall(Call call) {
-    _callManager.addCall(call);
-    
-    if (call.direction == 'incoming') {
-      _showIncomingCallDialog(call);
-    }
-  }
-
   void _showIncomingCallDialog(Call call) {
+    final sipService = ref.read(sipServiceProvider);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -67,14 +73,14 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              _sipService.hangup(call);
+              sipService.hangup(call);
               Navigator.pop(context);
             },
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
             onPressed: () {
-              _sipService.answer(call);
+              sipService.answer(call);
               Navigator.pop(context);
               Navigator.push(
                 context,
@@ -92,52 +98,69 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(currentIndexProvider);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('SIP Phone'),
         actions: [
-          StreamBuilder<RegistrationState>(
-            stream: _sipService.registrationStream,
-            builder: (context, snapshot) {
-              final isConnected = snapshot.data?.state == RegistrationStateEnum.REGISTERED;
-              final isReconnecting = _sipService.isReconnecting;
+          Consumer(
+            builder: (context, ref, child) {
+              final registrationState = ref.watch(registrationStateProvider);
+              final isReconnecting = ref.watch(isReconnectingProvider);
               
-              Color statusColor;
-              String statusText;
-              IconData statusIcon;
-              
-              if (isReconnecting) {
-                statusColor = Colors.orange;
-                statusText = 'Reconnecting';
-                statusIcon = Icons.sync;
-              } else if (isConnected) {
-                statusColor = Colors.green;
-                statusText = 'Connected';
-                statusIcon = Icons.circle;
-              } else {
-                statusColor = Colors.red;
-                statusText = 'Disconnected';
-                statusIcon = Icons.circle;
-              }
-              
-              return Container(
-                margin: const EdgeInsets.only(right: 16),
-                child: Row(
-                  children: [
-                    Icon(
-                      statusIcon,
-                      color: statusColor,
-                      size: 12,
+              return registrationState.when(
+                data: (state) {
+                  final isConnected = state.state == RegistrationStateEnum.REGISTERED;
+                  
+                  Color statusColor;
+                  String statusText;
+                  IconData statusIcon;
+                  
+                  if (isReconnecting) {
+                    statusColor = Colors.orange;
+                    statusText = 'Reconnecting';
+                    statusIcon = Icons.sync;
+                  } else if (isConnected) {
+                    statusColor = Colors.green;
+                    statusText = 'Connected';
+                    statusIcon = Icons.circle;
+                  } else {
+                    statusColor = Colors.red;
+                    statusText = 'Disconnected';
+                    statusIcon = Icons.circle;
+                  }
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(right: 16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          statusIcon,
+                          color: statusColor,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          statusText,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                  );
+                },
+                loading: () => const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                error: (error, stack) => const Icon(
+                  Icons.error,
+                  color: Colors.red,
+                  size: 16,
                 ),
               );
             },
@@ -145,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: IndexedStack(
-        index: _currentIndex,
+        index: currentIndex,
         children: [
           const DialerScreen(),
           const Center(child: Text('Call History')),
@@ -153,8 +176,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        currentIndex: currentIndex,
+        onTap: (index) => ref.read(currentIndexProvider.notifier).state = index,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dialpad),
@@ -171,12 +194,5 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _sipService.dispose();
-    _callManager.dispose();
-    super.dispose();
   }
 }

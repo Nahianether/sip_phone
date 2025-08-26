@@ -3,10 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_ua/sip_ua.dart';
 import '../providers/sip_providers.dart';
 import 'dialer_screen.dart';
-import 'settings_screen.dart';
 import 'active_call_screen.dart';
-
-final currentIndexProvider = StateProvider<int>((ref) => 0);
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -21,36 +18,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _attemptAutoConnect();
-      _listenToCallStream();
-    });
-  }
-
-  void _listenToCallStream() {
-    ref.listen<AsyncValue<Call>>(callStateProvider, (previous, next) {
-      next.whenData((call) {
-        final callManager = ref.read(callManagerProvider);
-        callManager.addCall(call);
-        
-        if (call.direction == 'incoming') {
-          _showIncomingCallDialog(call);
-        }
-      });
     });
   }
 
   Future<void> _attemptAutoConnect() async {
     final sipService = ref.read(sipServiceProvider);
     final credentials = await sipService.getSavedCredentials();
+    
+    // Check if all required credentials are available and autoConnect is enabled
     if (credentials['username'] != null && 
         credentials['password'] != null && 
         credentials['server'] != null &&
         credentials['wsUrl'] != null) {
+      
+      // Check if autoConnect is enabled in saved settings
+      final settings = sipService.getSavedSettings();
+      if (settings?.autoConnect != true) {
+        debugPrint('Auto-connect disabled in settings');
+        return;
+      }
       
       String server = credentials['server']!;
       if (credentials['username']!.contains('@')) {
         server = credentials['username']!.split('@')[1];
       }
       
+      debugPrint('Attempting auto-connect with saved credentials');
       await sipService.connect(
         username: credentials['username']!,
         password: credentials['password']!,
@@ -59,6 +52,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         displayName: credentials['displayName'],
         saveCredentials: false,
       );
+    } else {
+      debugPrint('Auto-connect skipped: missing credentials');
     }
   }
 
@@ -98,101 +93,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentIndex = ref.watch(currentIndexProvider);
+    // Listen for call state changes
+    ref.listen<AsyncValue<Call>>(callStateProvider, (previous, next) {
+      next.whenData((call) {
+        final callManager = ref.read(callManagerProvider);
+        callManager.addCall(call);
+        
+        if (call.direction == 'incoming') {
+          _showIncomingCallDialog(call);
+        }
+      });
+    });
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('SIP Phone'),
-        actions: [
-          Consumer(
-            builder: (context, ref, child) {
-              final registrationState = ref.watch(registrationStateProvider);
-              final isReconnecting = ref.watch(isReconnectingProvider);
-              
-              return registrationState.when(
-                data: (state) {
-                  final isConnected = state.state == RegistrationStateEnum.REGISTERED;
-                  
-                  Color statusColor;
-                  String statusText;
-                  IconData statusIcon;
-                  
-                  if (isReconnecting) {
-                    statusColor = Colors.orange;
-                    statusText = 'Reconnecting';
-                    statusIcon = Icons.sync;
-                  } else if (isConnected) {
-                    statusColor = Colors.green;
-                    statusText = 'Connected';
-                    statusIcon = Icons.circle;
-                  } else {
-                    statusColor = Colors.red;
-                    statusText = 'Disconnected';
-                    statusIcon = Icons.circle;
-                  }
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(right: 16),
-                    child: Row(
-                      children: [
-                        Icon(
-                          statusIcon,
-                          color: statusColor,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          statusText,
-                          style: TextStyle(
-                            color: statusColor,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                loading: () => const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                error: (error, stack) => const Icon(
-                  Icons.error,
-                  color: Colors.red,
-                  size: 16,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: IndexedStack(
-        index: currentIndex,
-        children: [
-          const DialerScreen(),
-          const Center(child: Text('Call History')),
-          const SettingsScreen(),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
-        onTap: (index) => ref.read(currentIndexProvider.notifier).state = index,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dialpad),
-            label: 'Dialer',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'History',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-      ),
-    );
+    // Simply return the DialerScreen with its own tab navigation
+    return const DialerScreen();
   }
 }

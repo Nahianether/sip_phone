@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'screens/home_screen.dart';
 import 'screens/active_call_screen.dart';
 import 'screens/incoming_call_screen.dart';
 import 'services/navigation_service.dart';
+import 'services/permission_service.dart';
+import 'services/storage_service.dart';
+import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await StorageService.initialize();
   runApp(const ProviderScope(child: SipPhoneApp()));
 }
 
@@ -19,10 +23,7 @@ class SipPhoneApp extends StatelessWidget {
     return MaterialApp(
       title: 'SIP Phone',
       navigatorKey: NavigationService.navigatorKey,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
+      theme: AppTheme.lightTheme,
       home: const PermissionWrapper(),
       routes: {
         '/home': (context) => const HomeScreen(),
@@ -47,17 +48,18 @@ class PermissionWrapper extends ConsumerStatefulWidget {
 }
 
 class _PermissionWrapperState extends ConsumerState<PermissionWrapper> {
+  final PermissionService _permissionService = PermissionService();
+
   @override
   void initState() {
     super.initState();
-    _requestPermissions();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestPermissions();
+    });
   }
 
   Future<void> _requestPermissions() async {
-    await [
-      Permission.microphone,
-      Permission.camera,
-    ].request();
+    await _permissionService.requestAllPermissions(context);
   }
 
   @override

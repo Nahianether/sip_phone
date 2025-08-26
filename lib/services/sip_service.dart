@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:sip_ua/sip_ua.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../models/sip_settings_model.dart';
+import '../models/call_history_model.dart';
+import '../utils/phone_utils.dart';
+import 'storage_service.dart';
 import 'navigation_service.dart';
+import 'notification_service.dart';
 
 class SipService extends SipUaHelperListener {
   static final SipService _instance = SipService._internal();
@@ -33,6 +37,9 @@ class SipService extends SipUaHelperListener {
 
   // Navigation service
   final NavigationService _navigationService = NavigationService();
+  
+  // Notification service
+  final NotificationService _notificationService = NotificationService();
 
   final StreamController<RegistrationState> _registrationStateController =
       StreamController<RegistrationState>.broadcast();
@@ -308,12 +315,17 @@ class SipService extends SipUaHelperListener {
   }
 
   void hangup(Call call) {
+    // Stop notification alerts when call is hung up
+    _notificationService.stopIncomingCallAlert();
     call.hangup();
   }
 
   void answer(Call call) {
     try {
       debugPrint('🔥 DEBUG: Attempting to answer call - Call ID: ${call.id}');
+      
+      // Stop notification alerts when call is answered
+      _notificationService.stopIncomingCallAlert();
       
       // Simple answer call with minimal options
       final answerOptions = {
@@ -351,25 +363,48 @@ class SipService extends SipUaHelperListener {
     String wsUrl,
     String? displayName,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('sip_username', username);
-    await prefs.setString('sip_password', password);
-    await prefs.setString('sip_server', server);
-    await prefs.setString('sip_ws_url', wsUrl);
-    if (displayName != null) {
-      await prefs.setString('sip_display_name', displayName);
-    }
+    final settings = SipSettingsModel(
+      username: username,
+      password: password,
+      server: server,
+      wsUrl: wsUrl,
+      displayName: displayName,
+      autoConnect: true,
+    );
+    await StorageService.saveSipSettings(settings);
   }
 
   Future<Map<String, String?>> getSavedCredentials() async {
-    final prefs = await SharedPreferences.getInstance();
+    final settings = StorageService.getSipSettings();
     return {
-      'username': prefs.getString('sip_username'),
-      'password': prefs.getString('sip_password'),
-      'server': prefs.getString('sip_server'),
-      'wsUrl': prefs.getString('sip_ws_url'),
-      'displayName': prefs.getString('sip_display_name'),
+      'username': settings?.username,
+      'password': settings?.password,
+      'server': settings?.server,
+      'wsUrl': settings?.wsUrl,
+      'displayName': settings?.displayName,
     };
+  }
+
+  // Get saved settings model
+  SipSettingsModel? getSavedSettings() {
+    return StorageService.getSipSettings();
+  }
+
+  Future<void> _trackCallHistory(Call call, CallType type, {int duration = 0}) async {
+    final phoneNumber = call.remote_identity?.toString() ?? '';
+    if (phoneNumber.isEmpty) return;
+    
+    final sanitized = PhoneUtils.sanitizePhoneNumber(phoneNumber);
+    final callHistory = CallHistoryModel(
+      id: '${DateTime.now().millisecondsSinceEpoch}_${call.id}',
+      phoneNumber: sanitized,
+      contactName: null, // Will be populated by UI layer if contact exists
+      type: type,
+      timestamp: DateTime.now(),
+      duration: duration,
+    );
+    
+    await StorageService.addCallHistory(callHistory);
   }
 
   @override
@@ -427,6 +462,8 @@ class SipService extends SipUaHelperListener {
         statusMessage = 'Call initiating to ${call.remote_identity}';
         // Handle both incoming and outgoing calls
         if (call.direction.toLowerCase() == 'outgoing') {
+          // Track outgoing call
+          _trackCallHistory(call, CallType.outgoing);
           Future.delayed(Duration(milliseconds: 100), () {
             // Direct navigation using Navigator instead of NavigationService
             final context = NavigationService.navigatorKey.currentContext;
@@ -438,6 +475,8 @@ class SipService extends SipUaHelperListener {
             }
           });
         } else if (call.direction.toLowerCase() == 'incoming') {
+          // Track incoming call
+          _trackCallHistory(call, CallType.incoming);
           // Handle incoming call - navigate to incoming call screen
           _handleIncomingCall(call);
         }
@@ -482,6 +521,10 @@ class SipService extends SipUaHelperListener {
         break;
       case CallStateEnum.FAILED:
         statusMessage = 'Call failed to ${call.remote_identity}';
+        // Track as missed call if it was incoming and failed
+        if (call.direction.toLowerCase() == 'incoming') {
+          _trackCallHistory(call, CallType.missed);
+        }
         // Navigate back to home when call fails
         Future.delayed(Duration(milliseconds: 500), () {
           _navigationService.navigateToAndClearStack('/home');
@@ -523,6 +566,9 @@ class SipService extends SipUaHelperListener {
     _callStateController.add(call);
     _reconnectStatusController.add('Incoming call from ${call.remote_identity}');
     debugPrint('SIP: Incoming call from ${call.remote_identity}');
+
+    // Start vibration and ringtone
+    _notificationService.startIncomingCallAlert();
 
     Future.delayed(Duration(milliseconds: 100), () {
       final context = NavigationService.navigatorKey.currentContext;

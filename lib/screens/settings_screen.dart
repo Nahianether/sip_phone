@@ -19,6 +19,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _authUserController = TextEditingController();
   final _passwordController = TextEditingController();
   final _displayNameController = TextEditingController();
+  
+  bool _isPasswordVisible = false;
 
   @override
   void initState() {
@@ -112,8 +114,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final connectionType = ref.watch(connectionTypeProvider);
-    final autoReconnectEnabled = ref.watch(autoReconnectEnabledProvider);
     final isConnecting = ref.watch(isConnectingProvider);
     return SafeArea(
       child: Padding(
@@ -127,35 +127,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const Text(
               'Account Settings',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            
-            // Connection Type
-            const Text(
-              'Connection Type',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Radio<String>(
-                  value: 'TCP',
-                  groupValue: connectionType,
-                  onChanged: (value) {
-                    ref.read(connectionTypeProvider.notifier).state = value!;
-                  },
-                ),
-                const Text('TCP'),
-                const SizedBox(width: 40),
-                Radio<String>(
-                  value: 'WebSocket',
-                  groupValue: connectionType,
-                  onChanged: (value) {
-                    ref.read(connectionTypeProvider.notifier).state = value!;
-                  },
-                ),
-                const Text('WebSocket'),
-              ],
             ),
             const SizedBox(height: 20),
             
@@ -178,21 +149,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () {
-                  // TODO: Implement test connection
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Test connection feature coming soon')),
-                  );
-                },
-                icon: const Icon(Icons.network_check),
-                label: const Text('Test Connection'),
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             
             // SIP URI
             TextFormField(
@@ -241,14 +198,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.lock),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.visibility),
+                  icon: Icon(
+                    _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  ),
                   onPressed: () {
-                    // TODO: Toggle password visibility
+                    setState(() {
+                      _isPasswordVisible = !_isPasswordVisible;
+                    });
                   },
                 ),
-                hintText: 'iBOS123',
+                hintText: 'Enter your SIP password',
               ),
-              obscureText: true,
+              obscureText: !_isPasswordVisible,
               validator: (value) {
                 if (value?.isEmpty ?? true) {
                   return 'Please enter password';
@@ -267,23 +228,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 prefixIcon: Icon(Icons.badge),
                 hintText: '564613',
               ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Auto Reconnect Toggle
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Auto Reconnect', style: TextStyle(fontSize: 16)),
-                Switch(
-                  value: autoReconnectEnabled,
-                  onChanged: (value) {
-                    ref.read(autoReconnectEnabledProvider.notifier).state = value;
-                    final sipService = ref.read(sipServiceProvider);
-                    sipService.enableAutoReconnect(value);
-                  },
-                ),
-              ],
             ),
             const SizedBox(height: 30),
             

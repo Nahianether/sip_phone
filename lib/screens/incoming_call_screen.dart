@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_ua/sip_ua.dart';
-import '../services/sip_service.dart';
+import '../providers/sip_providers.dart';
 
-class IncomingCallScreen extends StatefulWidget {
+class IncomingCallScreen extends ConsumerStatefulWidget {
   final Call call;
 
   const IncomingCallScreen({super.key, required this.call});
 
   @override
-  State<IncomingCallScreen> createState() => _IncomingCallScreenState();
+  ConsumerState<IncomingCallScreen> createState() => _IncomingCallScreenState();
 }
 
-class _IncomingCallScreenState extends State<IncomingCallScreen>
+class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
     with TickerProviderStateMixin {
-  final SipService _sipService = SipService();
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -41,15 +41,15 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   void _acceptCall() {
-    print('🔥 DEBUG: User tapped accept button');
-    _sipService.answer(widget.call);
-    print('🔥 DEBUG: Called _sipService.answer(), waiting for call state changes...');
-    // Don't navigate immediately - let the SIP service handle navigation
-    // when the call reaches CONFIRMED state
+    debugPrint('🔥 DEBUG: User tapped accept button');
+    final sipService = ref.read(sipServiceProvider);
+    sipService.answer(widget.call);
+    debugPrint('🔥 DEBUG: Called sipService.answer(), waiting for call state changes...');
   }
 
   void _declineCall() {
-    _sipService.hangup(widget.call);
+    final sipService = ref.read(sipServiceProvider);
+    sipService.hangup(widget.call);
     Navigator.pop(context);
   }
 

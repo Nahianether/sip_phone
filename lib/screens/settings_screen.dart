@@ -1,57 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_ua/sip_ua.dart';
-import '../services/sip_service.dart';
+import '../providers/sip_providers.dart';
+import '../providers/settings_providers.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  final SipService _sipService = SipService();
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
-  
-  // Connection Type
-  String _connectionType = 'WebSocket';
   
   final _wsUrlController = TextEditingController();
   final _sipUriController = TextEditingController();
   final _authUserController = TextEditingController();
   final _passwordController = TextEditingController();
   final _displayNameController = TextEditingController();
-  
-  bool _isConnecting = false;
-  bool _autoReconnectEnabled = true;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedCredentials();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSavedCredentials();
+    });
   }
 
   Future<void> _loadSavedCredentials() async {
-    final credentials = await _sipService.getSavedCredentials();
-    setState(() {
-      _wsUrlController.text = credentials['wsUrl'] ?? '';
-      _sipUriController.text = credentials['username'] != null && credentials['server'] != null 
-          ? '${credentials['username']}@${credentials['server']}' 
-          : '';
-      _authUserController.text = credentials['username'] ?? '';
-      _passwordController.text = credentials['password'] ?? '';
-      _displayNameController.text = credentials['displayName'] ?? '';
-    });
+    final sipService = ref.read(sipServiceProvider);
+    final credentials = await sipService.getSavedCredentials();
+    
+    _wsUrlController.text = credentials['wsUrl'] ?? '';
+    _sipUriController.text = credentials['username'] != null && credentials['server'] != null 
+        ? '${credentials['username']}@${credentials['server']}' 
+        : '';
+    _authUserController.text = credentials['username'] ?? '';
+    _passwordController.text = credentials['password'] ?? '';
+    _displayNameController.text = credentials['displayName'] ?? '';
+    
+    ref.read(wsUrlProvider.notifier).state = credentials['wsUrl'] ?? '';
+    ref.read(authUserProvider.notifier).state = credentials['username'] ?? '';
+    ref.read(passwordProvider.notifier).state = credentials['password'] ?? '';
+    ref.read(displayNameProvider.notifier).state = credentials['displayName'] ?? '';
   }
 
   Future<void> _connect() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isConnecting = true;
-    });
+    ref.read(isConnectingProvider.notifier).state = true;
 
-    // Parse SIP URI to extract username and server
     final sipUri = _sipUriController.text;
     final username = _authUserController.text;
     String server = '';
@@ -61,7 +60,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     try {
-      final success = await _sipService.connect(
+      final sipService = ref.read(sipServiceProvider);
+      final success = await sipService.connect(
         username: username,
         password: _passwordController.text,
         server: server,
@@ -71,9 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : null,
       );
 
-      setState(() {
-        _isConnecting = false;
-      });
+      ref.read(isConnectingProvider.notifier).state = false;
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -85,9 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     } catch (e) {
-      setState(() {
-        _isConnecting = false;
-      });
+      ref.read(isConnectingProvider.notifier).state = false;
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -102,7 +98,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _disconnect() async {
-    await _sipService.disconnect();
+    final sipService = ref.read(sipServiceProvider);
+    await sipService.disconnect();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -115,6 +112,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final connectionType = ref.watch(connectionTypeProvider);
+    final autoReconnectEnabled = ref.watch(autoReconnectEnabledProvider);
+    final isConnecting = ref.watch(isConnectingProvider);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -140,22 +140,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Radio<String>(
                   value: 'TCP',
-                  groupValue: _connectionType,
+                  groupValue: connectionType,
                   onChanged: (value) {
-                    setState(() {
-                      _connectionType = value!;
-                    });
+                    ref.read(connectionTypeProvider.notifier).state = value!;
                   },
                 ),
                 const Text('TCP'),
                 const SizedBox(width: 40),
                 Radio<String>(
                   value: 'WebSocket',
-                  groupValue: _connectionType,
+                  groupValue: connectionType,
                   onChanged: (value) {
-                    setState(() {
-                      _connectionType = value!;
-                    });
+                    ref.read(connectionTypeProvider.notifier).state = value!;
                   },
                 ),
                 const Text('WebSocket'),
@@ -280,12 +276,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 const Text('Auto Reconnect', style: TextStyle(fontSize: 16)),
                 Switch(
-                  value: _autoReconnectEnabled,
+                  value: autoReconnectEnabled,
                   onChanged: (value) {
-                    setState(() {
-                      _autoReconnectEnabled = value;
-                    });
-                    _sipService.enableAutoReconnect(value);
+                    ref.read(autoReconnectEnabledProvider.notifier).state = value;
+                    final sipService = ref.read(sipServiceProvider);
+                    sipService.enableAutoReconnect(value);
                   },
                 ),
               ],
@@ -293,74 +288,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 30),
             
             // Connection Status and Buttons
-            StreamBuilder<RegistrationState>(
-              stream: _sipService.registrationStream,
-              builder: (context, snapshot) {
-                final isConnected = snapshot.data?.state == RegistrationStateEnum.REGISTERED;
+            Consumer(
+              builder: (context, ref, child) {
+                final registrationState = ref.watch(registrationStateProvider);
+                final reconnectStatus = ref.watch(reconnectStatusProvider);
+                final sipService = ref.watch(sipServiceProvider);
                 
-                return Column(
-                  children: [
-                    // Reconnection Status
-                    StreamBuilder<String>(
-                      stream: _sipService.reconnectStatusStream,
-                      builder: (context, reconnectSnapshot) {
-                        if (reconnectSnapshot.hasData && _sipService.isReconnecting) {
-                          return Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.orange),
-                            ),
-                            child: Row(
-                              children: [
-                                const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(child: Text(reconnectSnapshot.data!)),
-                              ],
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
+                return registrationState.when(
+                  data: (state) {
+                    final isConnected = state.state == RegistrationStateEnum.REGISTERED;
                     
-                    // Connect/Disconnect Button
-                    if (!isConnected)
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isConnecting ? null : _connect,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: _isConnecting
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text('Register', style: TextStyle(fontSize: 16)),
+                    return Column(
+                      children: [
+                        // Reconnection Status
+                        reconnectStatus.when(
+                          data: (status) {
+                            if (sipService.isReconnecting) {
+                              return Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                margin: const EdgeInsets.only(bottom: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.orange),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: Text(status)),
+                                  ],
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (error, stack) => const SizedBox.shrink(),
                         ),
-                      )
-                    else
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _disconnect,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                        
+                        // Connect/Disconnect Button
+                        if (!isConnected)
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: isConnecting ? null : _connect,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: isConnecting
+                                  ? const CircularProgressIndicator(color: Colors.white)
+                                  : const Text('Register', style: TextStyle(fontSize: 16)),
+                            ),
+                          )
+                        else
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _disconnect,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: const Text('Disconnect', style: TextStyle(fontSize: 16)),
+                            ),
                           ),
-                          child: const Text('Disconnect', style: TextStyle(fontSize: 16)),
-                        ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, stack) => Center(child: Text('Error: $error')),
                 );
               },
             ),

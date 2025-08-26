@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sip_phone/services/call_kit.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'screens/home_screen.dart';
 import 'screens/active_call_screen.dart';
@@ -9,6 +10,7 @@ import 'services/navigation_service.dart';
 import 'services/websocket_service.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: SipPhoneApp()));
 }
 
@@ -20,10 +22,7 @@ class SipPhoneApp extends StatelessWidget {
     return MaterialApp(
       title: 'SIP Phone',
       navigatorKey: NavigationService.navigatorKey,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue, visualDensity: VisualDensity.adaptivePlatformDensity),
       home: const PermissionWrapper(),
       routes: {
         '/home': (context) => const HomeScreen(),
@@ -47,27 +46,26 @@ class PermissionWrapper extends ConsumerStatefulWidget {
   ConsumerState<PermissionWrapper> createState() => _PermissionWrapperState();
 }
 
-class _PermissionWrapperState extends ConsumerState<PermissionWrapper> {
+class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _requestPermissions();
+    checkAndNavigationCallingPage();
   }
 
   Future<void> _requestPermissions() async {
-    await [
-      Permission.microphone,
-      Permission.camera,
-    ].request();
-    
+    await [Permission.microphone, Permission.camera].request();
+
     WebSocketService.setMessageHandler((String message) {
       print('Received WebSocket message: $message');
     });
-    
+
     WebSocketService.setConnectionStatusHandler((bool isConnected) {
       print('WebSocket connection status changed: $isConnected');
     });
-    
+
     // SIP configuration as your server expects
     final sipConfig = SipConfig(
       wsUrl: 'wss://sip.ibos.io:8089/ws',
@@ -76,8 +74,28 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> {
       password: 'iBOS123',
       displayName: 'Remon',
     );
-    
+
     await WebSocketService.connectWithSipConfig(sipConfig);
+    await init_();
+  }
+
+  Future<void> checkAndNavigationCallingPage() async {
+    // NavigationService.navigatorKey.instance.pushNamedIfNotCurrent('incoming_call', args: currentCall);
+  }
+
+  @override
+  Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
+    print(state);
+    if (state == AppLifecycleState.resumed) {
+      //Check call when open app from background
+      checkAndNavigationCallingPage();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

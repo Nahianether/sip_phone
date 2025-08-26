@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sip_phone/services/call_kit.dart' show showIncomming;
 import 'package:sip_ua/sip_ua.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'navigation_service.dart';
@@ -26,7 +27,7 @@ class SipService extends SipUaHelperListener {
   int _reconnectAttempts = 0;
   final int _maxReconnectAttempts = 10;
   final List<int> _reconnectDelays = [1, 2, 5, 10, 15, 20, 30, 45, 60, 90]; // seconds
-  
+
   // Connection health monitoring
   DateTime? _lastSuccessfulConnection;
   int _connectionFailures = 0;
@@ -126,7 +127,7 @@ class SipService extends SipUaHelperListener {
       try {
         _helper!.start(settings);
         _reconnectStatusController.add('Initializing SIP connection...');
-        
+
         // Add connection timeout mechanism
         bool connectionEstablished = false;
         Timer(const Duration(seconds: 15), () {
@@ -181,7 +182,7 @@ class SipService extends SipUaHelperListener {
         ? _reconnectAttempts - 1
         : _reconnectDelays.length - 1;
     final delay = _reconnectDelays[delayIndex];
-    
+
     _reconnectStatusController.add('Reconnecting in $delay seconds...');
     await Future.delayed(Duration(seconds: delay));
 
@@ -314,15 +315,12 @@ class SipService extends SipUaHelperListener {
   void answer(Call call) {
     try {
       debugPrint('🔥 DEBUG: Attempting to answer call - Call ID: ${call.id}');
-      
+
       // Simple answer call with minimal options
       final answerOptions = {
-        'mediaConstraints': {
-          'audio': true,
-          'video': false,
-        },
+        'mediaConstraints': {'audio': true, 'video': false},
       };
-      
+
       call.answer(answerOptions);
       _reconnectStatusController.add('Call answered');
       debugPrint('🔥 DEBUG: Call.answer() method called successfully');
@@ -400,12 +398,12 @@ class SipService extends SipUaHelperListener {
   @override
   void transportStateChanged(TransportState state) {
     debugPrint('🔥 DEBUG: transportStateChanged called - State: ${state.state}');
-    
+
     // Handle transport disconnection
     if (state.state == TransportStateEnum.DISCONNECTED) {
       _connectionFailures++;
       _reconnectStatusController.add('Transport disconnected');
-      
+
       if (_connected && _autoReconnectEnabled && !_isReconnecting) {
         _reconnectStatusController.add('Transport lost, attempting to reconnect...');
         Future.microtask(() => _attemptReconnectImmediate());
@@ -420,7 +418,6 @@ class SipService extends SipUaHelperListener {
     debugPrint('🔥 DEBUG: callStateChanged called - State: ${callState.state}, Direction: ${call.direction}');
     _callStateController.add(call);
 
-    // Add detailed call state logging
     String statusMessage = '';
     switch (callState.state) {
       case CallStateEnum.CALL_INITIATION:
@@ -440,6 +437,7 @@ class SipService extends SipUaHelperListener {
         } else if (call.direction.toLowerCase() == 'incoming') {
           // Handle incoming call - navigate to incoming call screen
           _handleIncomingCall(call);
+          showIncomming();
         }
         break;
       case CallStateEnum.CONNECTING:

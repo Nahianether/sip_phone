@@ -1,5 +1,8 @@
+import 'dart:developer' show log;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sip_phone/providers/incoming.p.dart';
 import 'package:sip_phone/services/call_kit.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'screens/home_screen.dart';
@@ -12,6 +15,7 @@ import 'services/storage_service.dart';
 import 'services/sip_service.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'providers/sip_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +29,9 @@ class SipPhoneApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(isDarkModeProvider);
+    
+    // Initialize auto-connect at app level
+    ref.watch(keepAliveAutoConnectProvider);
 
     return MaterialApp(
       title: 'SIP Phone',
@@ -42,7 +49,7 @@ class SipPhoneApp extends ConsumerWidget {
         },
         '/incoming_call': (context) {
           final call = ModalRoute.of(context)!.settings.arguments as Call;
-          return IncomingCallScreen(call: call);
+          return IncomingCallScreen(call: tempCall ?? call);
         },
       },
     );
@@ -94,6 +101,7 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
       debugPrint('Auto-connecting with stored credentials...');
       // Use SipService instead of WebSocketService for proper SIP connection
       final sipService = SipService();
+      log('_requestPermissions --------------------------${storedSettings.username!}');
       await sipService.connect(
         username: storedSettings.username!,
         password: storedSettings.password!,

@@ -15,7 +15,7 @@ dependencies:
   sip_ua: ^1.0.1
   # Additional dependencies for VoIP functionality
   permission_handler: ^11.3.1
-  flutter_riverpod: ^2.5.1
+  flutter_riverpod: ^2.6.1
   flutter_callkit_incoming: ^2.5.8
   uuid: ^4.5.1
   
@@ -36,13 +36,17 @@ dependencies:
   
   # URL launcher for phone calls
   url_launcher: ^6.2.4
+  riverpod_annotation: ^2.6.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   hive_generator: ^2.0.1
-  build_runner: ^2.4.9
+  build_runner: ^2.5.4
+  riverpod_generator: ^2.6.3
+  custom_lint: ^0.7.0
+  riverpod_lint: ^2.6.3
 
 flutter:
   uses-material-design: true

@@ -40,7 +40,106 @@ final connectionStatusProvider = Provider<bool>((ref) {
   );
 });
 
-final isReconnectingProvider = Provider<bool>((ref) {
-  final sipService = ref.watch(sipServiceProvider);
-  return sipService.isReconnecting;
+final autoConnectProvider = FutureProvider<bool>((ref) async {
+  print('🔄 AutoConnect Provider: Starting auto-connect process');
+  final sipService = ref.read(sipServiceProvider);
+  
+  // Check if already connected
+  if (sipService.connected) {
+    print('✅ AutoConnect Provider: Already connected');
+    return true;
+  }
+  
+  final credentials = await sipService.getSavedCredentials();
+  print('🔍 AutoConnect Provider: Retrieved credentials - username: ${credentials['username']}, server: ${credentials['server']}');
+  
+  // Check if all required credentials are available and autoConnect is enabled
+  if (credentials['username'] != null &&
+      credentials['password'] != null &&
+      credentials['server'] != null &&
+      credentials['wsUrl'] != null) {
+    
+    // Check if autoConnect is enabled in saved settings
+    final settings = sipService.getSavedSettings();
+    print('⚙️ AutoConnect Provider: Auto-connect enabled: ${settings?.autoConnect}');
+    if (settings?.autoConnect != true) {
+      print('❌ AutoConnect Provider: Auto-connect disabled in settings');
+      return false;
+    }
+
+    String server = credentials['server']!;
+    if (credentials['username']!.contains('@')) {
+      server = credentials['username']!.split('@')[1];
+    }
+
+    print('🚀 AutoConnect Provider: Attempting connection for ${credentials['username']}');
+    final result = await sipService.connect(
+      username: credentials['username']!,
+      password: credentials['password']!,
+      server: server,
+      wsUrl: credentials['wsUrl']!,
+      displayName: credentials['displayName'],
+      saveCredentials: false,
+    );
+    print('📞 AutoConnect Provider: Connection result: $result');
+    return result;
+  } else {
+    print('❌ AutoConnect Provider: Missing credentials');
+  }
+  
+  return false;
 });
+
+// Keep the auto-connect provider alive to prevent multiple connection attempts  
+final keepAliveAutoConnectProvider = FutureProvider<bool>((ref) async {
+  ref.keepAlive();
+  print('🔄 KeepAlive Provider: Initializing connection');
+  
+  final sipService = ref.read(sipServiceProvider);
+  
+  // Check if already connected
+  if (sipService.connected) {
+    print('✅ KeepAlive Provider: Already connected');
+    return true;
+  }
+  
+  final credentials = await sipService.getSavedCredentials();
+  print('🔍 KeepAlive Provider: Retrieved credentials - username: ${credentials['username']}, server: ${credentials['server']}');
+  
+  // Check if all required credentials are available and autoConnect is enabled
+  if (credentials['username'] != null &&
+      credentials['password'] != null &&
+      credentials['server'] != null &&
+      credentials['wsUrl'] != null) {
+    
+    // Check if autoConnect is enabled in saved settings
+    final settings = sipService.getSavedSettings();
+    print('⚙️ KeepAlive Provider: Auto-connect enabled: ${settings?.autoConnect}');
+    if (settings?.autoConnect != true) {
+      print('❌ KeepAlive Provider: Auto-connect disabled in settings');
+      return false;
+    }
+
+    String server = credentials['server']!;
+    if (credentials['username']!.contains('@')) {
+      server = credentials['username']!.split('@')[1];
+    }
+
+    print('🚀 KeepAlive Provider: Attempting connection for ${credentials['username']}');
+    final result = await sipService.connect(
+      username: credentials['username']!,
+      password: credentials['password']!,
+      server: server,
+      wsUrl: credentials['wsUrl']!,
+      displayName: credentials['displayName'],
+      saveCredentials: false,
+    );
+    print('📞 KeepAlive Provider: Connection result: $result');
+    return result;
+  } else {
+    print('❌ KeepAlive Provider: Missing credentials');
+  }
+  
+  return false;
+});
+

@@ -72,101 +72,73 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
     final colorScheme = Theme.of(context).colorScheme;
     
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Recent'),
+        elevation: 0,
+        backgroundColor: colorScheme.surface,
+      ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
-            SliverAppBar(
-              expandedHeight: 120,
-              floating: true,
-              pinned: true,
-              elevation: 0,
-              backgroundColor: colorScheme.surface,
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  'Recent',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+            SliverToBoxAdapter(
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                centerTitle: false,
-                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(
-                    Icons.clear_all_rounded,
-                    color: colorScheme.onSurface,
-                  ),
-                  onPressed: () async {
-                    final confirmed = await _showClearHistoryDialog(context);
-                    if (confirmed) {
-                      await StorageService.clearCallHistory();
-                      ref.invalidate(callHistoryProvider);
-                    }
-                  },
-                ),
-              ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(48),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: colorScheme.primary,
+                  unselectedLabelColor: colorScheme.onSurfaceVariant,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicator: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.primary.withValues(alpha: 0.1),
                   ),
-                  child: TabBar(
-                    controller: _tabController,
-                    labelColor: colorScheme.primary,
-                    unselectedLabelColor: colorScheme.onSurfaceVariant,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: colorScheme.primary.withValues(alpha: 0.1),
+                  dividerColor: Colors.transparent,
+                  tabs: [
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.history_rounded, size: 16),
+                          const SizedBox(width: 4),
+                          Text('All', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
                     ),
-                    dividerColor: Colors.transparent,
-                    tabs: [
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.history_rounded, size: 16),
-                            const SizedBox(width: 4),
-                            Text('All', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.call_received_rounded, size: 16, color: Colors.red.shade600),
+                          const SizedBox(width: 4),
+                          Text('Missed', style: TextStyle(fontSize: 12)),
+                        ],
                       ),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.call_received_rounded, size: 16, color: Colors.red.shade600),
-                            const SizedBox(width: 4),
-                            Text('Missed', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.call_received_rounded, size: 16, color: Colors.green.shade600),
+                          const SizedBox(width: 4),
+                          Text('In', style: TextStyle(fontSize: 12)),
+                        ],
                       ),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.call_received_rounded, size: 16, color: Colors.green.shade600),
-                            const SizedBox(width: 4),
-                            Text('In', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.call_made_rounded, size: 16, color: colorScheme.primary),
+                          const SizedBox(width: 4),
+                          Text('Out', style: TextStyle(fontSize: 12)),
+                        ],
                       ),
-                      Tab(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.call_made_rounded, size: 16, color: colorScheme.primary),
-                            const SizedBox(width: 4),
-                            Text('Out', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -543,50 +515,4 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
     ) ?? false;
   }
 
-  Future<bool> _showClearHistoryDialog(BuildContext context) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: Icon(
-          Icons.clear_all_rounded,
-          color: colorScheme.error,
-          size: 32,
-        ),
-        title: Text(
-          'Clear Call History',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to clear all call history? This action cannot be undone.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-            ),
-            child: const Text('Clear All'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
 }

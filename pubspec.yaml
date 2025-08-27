@@ -18,22 +18,24 @@ dependencies:
   flutter_riverpod: ^2.5.1
   flutter_callkit_incoming: ^2.5.8
   uuid: ^4.5.1
-  
+
   # Data storage
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  
-  # Contacts and phone functionality  
+
+  http: ^1.5.0
+
+  # Contacts and phone functionality
   device_info_plus: ^9.1.2
   flutter_contacts: ^1.1.9
-  
+
   # Modern UI and animations
   google_fonts: ^6.2.1
   flutter_animate: ^4.5.0
-  
+
   # Audio
   audioplayers: ^5.2.1
-  
+
   # URL launcher for phone calls
   url_launcher: ^6.2.4
 

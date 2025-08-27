@@ -19,6 +19,7 @@ class SipService extends SipUaHelperListener {
   bool _connected = false;
   bool _autoReconnectEnabled = true;
   bool _isReconnecting = false;
+  bool _handlingIncomingCall = false; // Prevent multiple simultaneous calls
 
   // Connection credentials for reconnection
   String? _lastUsername;
@@ -562,12 +563,27 @@ class SipService extends SipUaHelperListener {
               debugPrint('🔥 DEBUG: No context available for navigation');
             }
           });
-        } else if (call.direction.toLowerCase() == 'incoming') {
+        } else if (call.direction.toLowerCase() == 'incoming' && !_handlingIncomingCall) {
+          _handlingIncomingCall = true; // Prevent multiple simultaneous calls
+          
           // Track incoming call
           _trackCallHistory(call, CallType.incoming);
-          // Handle incoming call - navigate to incoming call screen
+          debugPrint('🔥 DEBUG: Incoming call from ${call.remote_identity}');
+          
+          try {
+            // Show CallKit with proper error handling
+            await showIncomming(call.id ?? DateTime.now().millisecondsSinceEpoch.toString(), 
+                               call.remote_identity ?? 'Unknown');
+            debugPrint('🔥 DEBUG: CallKit shown successfully');
+          } catch (callKitError) {
+            debugPrint('🔥 DEBUG: CallKit error (non-fatal): $callKitError');
+            // Continue with in-app handling even if CallKit fails
+          }
+          
+          // Always show in-app screen as backup
           _handleIncomingCall(call);
-          await showIncomming(call.id ?? 'id', call.remote_identity ?? 'Number');
+        } else if (call.direction.toLowerCase() == 'incoming' && _handlingIncomingCall) {
+          debugPrint('🔥 DEBUG: Already handling incoming call, ignoring duplicate');
         }
         break;
       case CallStateEnum.CONNECTING:
@@ -603,6 +619,7 @@ class SipService extends SipUaHelperListener {
         break;
       case CallStateEnum.ENDED:
         statusMessage = 'Call ended with ${call.remote_identity}';
+        _handlingIncomingCall = false; // Reset flag when call ends
         // Navigate back to home when call ends
         Future.delayed(Duration(milliseconds: 500), () {
           _navigationService.navigateToAndClearStack('/home');
@@ -610,6 +627,7 @@ class SipService extends SipUaHelperListener {
         break;
       case CallStateEnum.FAILED:
         statusMessage = 'Call failed to ${call.remote_identity}';
+        _handlingIncomingCall = false; // Reset flag when call fails
         // Track as missed call if it was incoming and failed
         if (call.direction.toLowerCase() == 'incoming') {
           _trackCallHistory(call, CallType.missed);
@@ -659,13 +677,19 @@ class SipService extends SipUaHelperListener {
     // Start vibration and ringtone
     _notificationService.startIncomingCallAlert();
 
-    Future.delayed(Duration(milliseconds: 100), () {
-      final context = NavigationService.navigatorKey.currentContext;
-      if (context != null && context.mounted) {
-        Navigator.pushNamed(context, '/incoming_call', arguments: call);
-        debugPrint('🔥 DEBUG: Incoming call navigation successful');
-      } else {
-        debugPrint('🔥 DEBUG: Incoming call - No context available for navigation');
+    // Delay navigation to avoid conflicts with CallKit
+    Future.delayed(Duration(milliseconds: 500), () {
+      try {
+        final context = NavigationService.navigatorKey.currentContext;
+        if (context != null && context.mounted) {
+          Navigator.pushNamed(context, '/incoming_call', arguments: call);
+          debugPrint('🔥 DEBUG: Incoming call navigation successful');
+        } else {
+          debugPrint('🔥 DEBUG: Incoming call - No context available for navigation');
+        }
+      } catch (navError) {
+        debugPrint('🔥 DEBUG: Navigation error: $navError');
+        // Don't crash the app if navigation fails
       }
     });
   }

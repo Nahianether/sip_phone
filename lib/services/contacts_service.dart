@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../utils/phone_utils.dart';
 
 class ContactModel {
@@ -28,33 +30,69 @@ class AppContactsService {
 
   Future<List<ContactModel>> loadContacts() async {
     try {
-      // For now, return sample contacts since contact access requires platform-specific implementation
-      _contacts = [
-        ContactModel(
-          id: '1',
-          name: 'John Doe',
-          phoneNumber: '1234567890',
-        ),
-        ContactModel(
-          id: '2', 
-          name: 'Jane Smith',
-          phoneNumber: '9876543210',
-        ),
-        ContactModel(
-          id: '3',
-          name: 'Bob Johnson', 
-          phoneNumber: '5555551234',
-        ),
-      ];
+      // Check if contacts permission is granted
+      final permissionStatus = await Permission.contacts.status;
+      debugPrint('🔍 Contacts permission status: $permissionStatus');
+      
+      if (!await Permission.contacts.isGranted) {
+        debugPrint('❌ Contacts permission not granted');
+        return [];
+      }
+
+      debugPrint('📱 Loading device contacts...');
+      
+      // Get all contacts with phone numbers
+      final List<Contact> deviceContacts = await FlutterContacts.getContacts(
+        withProperties: true,
+        withPhoto: false, // We can add photos later if needed
+      );
+      
+      debugPrint('📞 Found ${deviceContacts.length} device contacts');
+      
+      // Convert to our ContactModel and filter out contacts without phone numbers
+      _contacts = deviceContacts
+          .where((contact) => contact.phones.isNotEmpty && contact.displayName.isNotEmpty)
+          .expand((contact) {
+            // Create a ContactModel for each phone number
+            return contact.phones.map((phone) => ContactModel(
+              id: '${contact.id}_${phone.number.hashCode}',
+              name: contact.displayName,
+              phoneNumber: phone.number,
+            ));
+          })
+          .toList();
+      
+      // Remove duplicates based on phone number
+      final Map<String, ContactModel> uniqueContacts = {};
+      for (var contact in _contacts) {
+        final sanitized = contact.sanitizedPhone;
+        if (sanitized.isNotEmpty && !uniqueContacts.containsKey(sanitized)) {
+          uniqueContacts[sanitized] = contact;
+        }
+      }
+      
+      _contacts = uniqueContacts.values.toList();
       
       // Sort contacts alphabetically
-      _contacts.sort((a, b) => a.name.compareTo(b.name));
+      _contacts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       
-      debugPrint('Loaded ${_contacts.length} sample contacts');
+      debugPrint('✅ Successfully loaded ${_contacts.length} real device contacts');
+      
+      // Debug: Print first few contacts
+      if (_contacts.isNotEmpty) {
+        debugPrint('📋 First contacts:');
+        for (int i = 0; i < (_contacts.length > 3 ? 3 : _contacts.length); i++) {
+          final contact = _contacts[i];
+          debugPrint('  ${i + 1}. ${contact.name} - ${contact.phoneNumber}');
+        }
+      }
+      
       return _contacts;
     } catch (e) {
-      debugPrint('Error loading contacts: $e');
-      return [];
+      debugPrint('❌ Error loading device contacts: $e');
+      // Return empty list instead of dummy data when there's an error
+      _contacts = [];
+      throw Exception('Failed to load contacts: $e');
     }
   }
 
@@ -85,4 +123,14 @@ class AppContactsService {
     final contact = findContactByNumber(phoneNumber);
     return contact?.name ?? PhoneUtils.formatPhoneNumber(phoneNumber);
   }
+
+  // Refresh contacts - useful for manual refresh
+  Future<List<ContactModel>> refreshContacts() async {
+    debugPrint('🔄 Refreshing contacts...');
+    _contacts.clear();
+    return await loadContacts();
+  }
+
+  // Check if we have loaded contacts
+  bool get hasLoadedContacts => _contacts.isNotEmpty;
 }

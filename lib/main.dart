@@ -25,13 +25,14 @@ class SipPhoneApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(isDarkModeProvider);
-    
+
     return MaterialApp(
       title: 'SIP Phone',
       navigatorKey: NavigationService.navigatorKey,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      debugShowCheckedModeBanner: false, // Remove debug banner
       home: const PermissionWrapper(),
       routes: {
         '/home': (context) => const HomeScreen(),
@@ -71,23 +72,26 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
     await _permissionService.requestAllPermissions(context);
 
     WebSocketService.setMessageHandler((String message) {
-      print('Received WebSocket message: $message');
+      debugPrint('Received WebSocket message: $message');
     });
 
     WebSocketService.setConnectionStatusHandler((bool isConnected) {
-      print('WebSocket connection status changed: $isConnected');
+      debugPrint('WebSocket connection status changed: $isConnected');
     });
+
+    // Initialize CallKit listener for iOS call handling
+    listenCallkit();
+    debugPrint('CallKit listener initialized');
 
     // Check for stored SIP credentials before attempting auto-connect
     final storedSettings = StorageService.getSipSettings();
-    if (storedSettings != null && 
+    if (storedSettings != null &&
         storedSettings.autoConnect == true &&
         storedSettings.username?.isNotEmpty == true &&
         storedSettings.password?.isNotEmpty == true &&
         storedSettings.server?.isNotEmpty == true &&
         storedSettings.wsUrl?.isNotEmpty == true) {
-      
-      print('Auto-connecting with stored credentials...');
+      debugPrint('Auto-connecting with stored credentials...');
       // Use SipService instead of WebSocketService for proper SIP connection
       final sipService = SipService();
       await sipService.connect(
@@ -99,9 +103,9 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
         saveCredentials: false, // Don't save again
       );
     } else {
-      print('Auto-connect skipped: missing credentials');
+      debugPrint('Auto-connect skipped: missing credentials');
     }
-    
+
     await init_();
   }
 
@@ -111,7 +115,7 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
 
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
-    print(state);
+    debugPrint(state.toString());
     if (state == AppLifecycleState.resumed) {
       //Check call when open app from background
       checkAndNavigationCallingPage();

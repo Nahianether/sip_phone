@@ -28,9 +28,19 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   }
 
   Future<void> _checkPermissionsAndLoadContacts() async {
-    final hasPermission = await _permissionService.checkContactsPermission(context);
-    if (hasPermission) {
-      ref.invalidate(contactsProvider);
+    try {
+      debugPrint('Checking contacts permission...');
+      final hasPermission = await _permissionService.checkContactsPermission(context);
+      debugPrint('Contacts permission result: $hasPermission');
+      
+      if (hasPermission) {
+        debugPrint('Loading contacts...');
+        ref.invalidate(contactsProvider);
+      } else {
+        debugPrint('Contacts permission denied, cannot load contacts');
+      }
+    } catch (e) {
+      debugPrint('Error checking contacts permission: $e');
     }
   }
 

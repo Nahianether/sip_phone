@@ -6,16 +6,25 @@ import 'package:flutter_callkit_incoming/entities/call_kit_params.dart';
 import 'package:flutter_callkit_incoming/entities/ios_params.dart';
 import 'package:flutter_callkit_incoming/entities/notification_params.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'navigation_service.dart';
 
 Future<void> showIncomming(String uid, String no) async {
   try {
-    // this._currentUuid = _uuid.v4();
+    log('CallKit: Attempting to show incoming call - ID: $uid, Number: $no');
+    
+    // Validate parameters
+    if (uid.isEmpty || no.isEmpty) {
+      log('CallKit: Invalid parameters - using defaults');
+      uid = DateTime.now().millisecondsSinceEpoch.toString();
+      no = 'Unknown';
+    }
+    
     CallKitParams callKitParams = CallKitParams(
-      id: '_currentUuid',
-      nameCaller: 'Hien Nguyen',
-      appName: 'Callkit',
+      id: uid,
+      nameCaller: no,
+      appName: 'SIP Phone',
       avatar: 'https://i.pravatar.cc/100',
-      handle: '0123456789',
+      handle: no,
       type: 0,
       textAccept: 'Accept',
       textDecline: 'Decline',
@@ -50,8 +59,8 @@ Future<void> showIncomming(String uid, String no) async {
       ios: IOSParams(
         iconName: 'CallKitLogo',
         handleType: 'generic',
-        supportsVideo: true,
-        maximumCallGroups: 2,
+        supportsVideo: false, // Changed to false to reduce complexity
+        maximumCallGroups: 1, // Reduced from 2 to 1
         maximumCallsPerCallGroup: 1,
         audioSessionMode: 'default',
         audioSessionActive: true,
@@ -64,9 +73,13 @@ Future<void> showIncomming(String uid, String no) async {
         ringtonePath: 'system_ringtone_default',
       ),
     );
+    
     await FlutterCallkitIncoming.showCallkitIncoming(callKitParams);
+    log('CallKit: Successfully shown incoming call interface');
   } catch (e) {
-    log(e.toString());
+    log('CallKit: Error showing incoming call - $e');
+    // Re-throw the error so calling code can handle it
+    throw Exception('CallKit failed: $e');
   }
 }
 
@@ -92,53 +105,93 @@ Future<void> init_() async {
 void listenCallkit() {
   FlutterCallkitIncoming.onEvent.listen((CallEvent? event) {
     if (event == null) return;
+    log('CallKit Event: ${event.event} - ${event.body}');
+    
     switch (event.event) {
       case Event.actionCallIncoming:
-        // TODO: received an incoming call
+        log('CallKit: Received incoming call');
         break;
       case Event.actionCallStart:
-        // TODO: started an outgoing call
-        // TODO: show screen calling in Flutter
+        log('CallKit: Started outgoing call');
         break;
       case Event.actionCallAccept:
-        // TODO: accepted an incoming call
-        // TODO: show screen calling in Flutter
+        log('CallKit: Accepted incoming call - navigating to in-app call screen');
+        // Navigate to incoming call screen in app when CallKit call is accepted
+        _navigateToIncomingCallScreen(event);
         break;
       case Event.actionCallDecline:
-        // TODO: declined an incoming call
+        log('CallKit: Declined incoming call');
         break;
       case Event.actionCallEnded:
-        // TODO: ended an incoming/outgoing call
+        log('CallKit: Call ended');
+        // Navigate back to home when CallKit call ends
+        _navigateToHome();
         break;
       case Event.actionCallTimeout:
-        // TODO: missed an incoming call
+        log('CallKit: Call timeout');
         break;
       case Event.actionCallCallback:
-        // TODO: click action `Call back` from missed call notification
+        log('CallKit: Call callback clicked');
         break;
       case Event.actionCallToggleHold:
-        // TODO: only iOS
+        log('CallKit: Toggle hold');
         break;
       case Event.actionCallToggleMute:
-        // TODO: only iOS
+        log('CallKit: Toggle mute');
         break;
       case Event.actionCallToggleDmtf:
-        // TODO: only iOS
+        log('CallKit: Toggle DTMF');
         break;
       case Event.actionCallToggleGroup:
-        // TODO: only iOS
+        log('CallKit: Toggle group');
         break;
       case Event.actionCallToggleAudioSession:
-        // TODO: only iOS
+        log('CallKit: Toggle audio session');
         break;
       case Event.actionDidUpdateDevicePushTokenVoip:
-        // TODO: only iOS
+        log('CallKit: VoIP token updated');
         break;
       case Event.actionCallCustom:
-        // TODO: for custom action
+        log('CallKit: Custom action');
         break;
       default:
-        {}
+        log('CallKit: Unknown event ${event.event}');
     }
   });
+}
+
+void _navigateToIncomingCallScreen(CallEvent event) {
+  try {
+    log('CallKit: Navigating to Flutter incoming call screen');
+    final navigationService = NavigationService();
+    final context = navigationService.currentContext;
+    
+    if (context != null && context.mounted) {
+      // For now, navigate to home since we don't have the actual Call object
+      // In a full implementation, you'd need to store the call reference
+      navigationService.navigateToAndClearStack('/home');
+      log('CallKit: Navigation to home successful');
+    } else {
+      log('CallKit: No context available for navigation');
+    }
+  } catch (e) {
+    log('CallKit: Navigation error - $e');
+  }
+}
+
+void _navigateToHome() {
+  try {
+    log('CallKit: Navigating to home screen');
+    final navigationService = NavigationService();
+    final context = navigationService.currentContext;
+    
+    if (context != null && context.mounted) {
+      navigationService.navigateToAndClearStack('/home');
+      log('CallKit: Navigation to home successful');
+    } else {
+      log('CallKit: No context available for home navigation');
+    }
+  } catch (e) {
+    log('CallKit: Home navigation error - $e');
+  }
 }

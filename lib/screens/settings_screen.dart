@@ -3,6 +3,7 @@ import 'dart:developer' show log;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_ua/sip_ua.dart';
+import '../providers/connection.p.dart' show serverConnectionProvider;
 import '../providers/sip_providers.dart';
 import '../providers/settings_providers.dart';
 
@@ -64,19 +65,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final sipService = ref.read(sipServiceProvider);
       log('_connect -------------- ------------$username');
-      final success = await sipService.connect(
-        username: username,
-        password: _passwordController.text,
-        server: server,
-        wsUrl: _wsUrlController.text,
-        displayName: _displayNameController.text.isNotEmpty ? _displayNameController.text : null,
-      );
+
+      final r_ = await ref.read(serverConnectionProvider.notifier).connect_();
+      ref.read(serverConnectionProvider.notifier).set(r_);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Attempting to register...' : 'Connection failed - please check your settings'),
-            backgroundColor: success ? Colors.green : Colors.red,
+            content: Text(r_ ? 'Attempting to register...' : 'Connection failed - please check your settings'),
+            backgroundColor: r_ ? Colors.green : Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -96,7 +93,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _disconnect() async {
     final sipService = ref.read(sipServiceProvider);
-    await sipService.disconnect();
+    await sipService.disconnect(ref);
     if (mounted) {
       ScaffoldMessenger.of(
         context,

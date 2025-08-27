@@ -20,12 +20,12 @@ final callStateProvider = StreamProvider<Call>((ref) {
   final sipService = ref.watch(sipServiceProvider);
   return sipService.callStream;
 });
-
+/*
 final reconnectStatusProvider = StreamProvider<String>((ref) {
   final sipService = ref.watch(sipServiceProvider);
   return sipService.reconnectStatusStream;
 });
-
+*/
 final activeCallsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   final callManager = ref.watch(callManagerProvider);
   return callManager.callsStream;
@@ -39,26 +39,27 @@ final connectionStatusProvider = Provider<bool>((ref) {
     error: (error, stack) => false,
   );
 });
-
+/*
 final autoConnectProvider = FutureProvider<bool>((ref) async {
   print('🔄 AutoConnect Provider: Starting auto-connect process');
   final sipService = ref.read(sipServiceProvider);
-  
+
   // Check if already connected
   if (sipService.connected) {
     print('✅ AutoConnect Provider: Already connected');
     return true;
   }
-  
+
   final credentials = await sipService.getSavedCredentials();
-  print('🔍 AutoConnect Provider: Retrieved credentials - username: ${credentials['username']}, server: ${credentials['server']}');
-  
+  print(
+    '🔍 AutoConnect Provider: Retrieved credentials - username: ${credentials['username']}, server: ${credentials['server']}',
+  );
+
   // Check if all required credentials are available and autoConnect is enabled
   if (credentials['username'] != null &&
       credentials['password'] != null &&
       credentials['server'] != null &&
       credentials['wsUrl'] != null) {
-    
     // Check if autoConnect is enabled in saved settings
     final settings = sipService.getSavedSettings();
     print('⚙️ AutoConnect Provider: Auto-connect enabled: ${settings?.autoConnect}');
@@ -86,32 +87,34 @@ final autoConnectProvider = FutureProvider<bool>((ref) async {
   } else {
     print('❌ AutoConnect Provider: Missing credentials');
   }
-  
+
   return false;
 });
+*/
 
-// Keep the auto-connect provider alive to prevent multiple connection attempts  
+/*
 final keepAliveAutoConnectProvider = FutureProvider<bool>((ref) async {
   ref.keepAlive();
   print('🔄 KeepAlive Provider: Initializing connection');
-  
+
   final sipService = ref.read(sipServiceProvider);
-  
+
   // Check if already connected
   if (sipService.connected) {
     print('✅ KeepAlive Provider: Already connected');
     return true;
   }
-  
+
   final credentials = await sipService.getSavedCredentials();
-  print('🔍 KeepAlive Provider: Retrieved credentials - username: ${credentials['username']}, server: ${credentials['server']}');
-  
+  print(
+    '🔍 KeepAlive Provider: Retrieved credentials - username: ${credentials['username']}, server: ${credentials['server']}',
+  );
+
   // Check if all required credentials are available and autoConnect is enabled
   if (credentials['username'] != null &&
       credentials['password'] != null &&
       credentials['server'] != null &&
       credentials['wsUrl'] != null) {
-    
     // Check if autoConnect is enabled in saved settings
     final settings = sipService.getSavedSettings();
     print('⚙️ KeepAlive Provider: Auto-connect enabled: ${settings?.autoConnect}');
@@ -139,7 +142,7 @@ final keepAliveAutoConnectProvider = FutureProvider<bool>((ref) async {
   } else {
     print('❌ KeepAlive Provider: Missing credentials');
   }
-  
+
   return false;
 });
-
+*/

@@ -51,6 +51,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    /*
     // Initialize auto-connect provider to trigger connection
     final autoConnectState = ref.watch(keepAliveAutoConnectProvider);
     print('🏠 HomeScreen: AutoConnect state: $autoConnectState');
@@ -61,7 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       loading: () => print('🏠 HomeScreen: Connection in progress...'),
       error: (error, stack) => print('🏠 HomeScreen: Connection error: $error'),
     );
-    
+    */
     // Listen for call state changes
     ref.listen<AsyncValue<Call>>(callStateProvider, (previous, next) {
       next.whenData((call) {

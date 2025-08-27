@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:developer' show log;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show WidgetRef;
+import 'package:sip_phone/providers/connection.p.dart';
 import 'package:sip_phone/services/call_kit.dart' show showIncomming;
 import 'package:sip_ua/sip_ua.dart';
 import '../models/sip_settings_model.dart';
@@ -16,9 +18,9 @@ class SipService extends SipUaHelperListener {
   factory SipService() => _instance;
   SipService._internal();
 
-  SIPUAHelper? _helper;
+  // SIPUAHelper? _helper;
   RegistrationState _registrationState = RegistrationState(state: RegistrationStateEnum.NONE);
-  bool _connected = false;
+  // bool _connected = false;
   bool _handlingIncomingCall = false; // Prevent multiple simultaneous calls
 
   // Navigation service
@@ -43,27 +45,29 @@ class SipService extends SipUaHelperListener {
   }
 
   Stream<Call> get callStream => _callStateController.stream;
-  Stream<String> get reconnectStatusStream {
-    // Emit initial status for new subscribers
-    Future.microtask(() {
-      if (!_reconnectStatusController.isClosed) {
-        _reconnectStatusController.add(_connected ? 'Connected' : 'Disconnected');
-      }
-    });
-    return _reconnectStatusController.stream;
-  }
+  // Stream<String> get reconnectStatusStream {
+  //   // Emit initial status for new subscribers
+  //   Future.microtask(() {
+  //     if (!_reconnectStatusController.isClosed) {
+  //       _reconnectStatusController.add(_connected ? 'Connected' : 'Disconnected');
+  //     }
+  //   });
+  //   return _reconnectStatusController.stream;
+  // }
 
   RegistrationState get registrationState => _registrationState;
-  bool get connected => _connected;
-
-  Future<bool> connect({
+  /*
+  Future<bool> connect(
+    WidgetRef ref, {
     required String username,
     required String password,
     required String server,
     required String wsUrl,
     String? displayName,
-    bool saveCredentials = true,
+    bool isSave = true,
   }) async {
+    final helper_ = ref.read(sipHelpersProvider);
+    final helperNotifier = ref.read(sipHelpersProvider.notifier);
     log('Connecting --------------------------$username');
     try {
       // Parameter validation
@@ -79,18 +83,18 @@ class SipService extends SipUaHelperListener {
       }
 
       // Graceful disconnect of existing connection
-      if (_helper != null) {
+      if (helper_ != null) {
         try {
-          _helper!.stop();
+          helperNotifier.stop();
           _reconnectStatusController.add('Disconnecting previous session...');
         } catch (e) {
           debugPrint('Error during cleanup: $e');
         }
-        _helper = null;
+        helperNotifier.set(null);
         await Future.delayed(const Duration(milliseconds: 1000));
       }
 
-      _helper = SIPUAHelper();
+      helperNotifier.set(SIPUAHelper());
 
       final UaSettings settings = UaSettings();
       settings.webSocketUrl = wsUrl;
@@ -121,58 +125,62 @@ class SipService extends SipUaHelperListener {
         return false;
       }
 
-      _helper!.addSipUaHelperListener(this);
+      helperNotifier.addService(this);
 
       try {
-        _helper!.start(settings);
+        await helperNotifier.start(settings);
         _reconnectStatusController.add('Initializing SIP connection...');
       } catch (startError) {
         _reconnectStatusController.add('Failed to start SIP connection: $startError');
-        _helper = null;
+        helperNotifier.set(null);
         return false;
       }
 
-      if (saveCredentials) {
-        await _saveCredentials(username, password, server, wsUrl, displayName);
+      if (isSave) {
+        await saveCredentials(username, password, server, wsUrl, displayName);
       }
 
       return true;
     } catch (e) {
       _reconnectStatusController.add('Connection error: ${e.toString()}');
-      _helper = null;
+      helperNotifier.set(null);
       return false;
     }
   }
-
-
-  Future<void> disconnect() async {
-    if (_helper != null) {
+*/
+  Future<void> disconnect(WidgetRef ref) async {
+    final helper_ = ref.read(sipHelpersProvider);
+    final helperNotifier = ref.read(sipHelpersProvider.notifier);
+    if (helper_ != null) {
       try {
-        _helper!.stop();
+        helperNotifier.stop();
       } catch (e) {
         // Ignore errors during disconnect
       }
-      _helper = null;
+      helperNotifier.set(null);
     }
-    _connected = false;
+    ref.read(serverConnectionProvider.notifier).set(false);
     _registrationState = RegistrationState(state: RegistrationStateEnum.NONE);
     _registrationStateController.add(_registrationState);
     _reconnectStatusController.add('Disconnected');
   }
 
-  Future<bool> makeCall(String target) async {
-    if (_helper == null) {
+  Future<bool> makeCall(String target, WidgetRef ref) async {
+    final connected_ = await ref.read(serverConnectionProvider.future);
+    final helper_ = ref.read(sipHelpersProvider);
+    final helperNotifier = ref.read(sipHelpersProvider.notifier);
+    if (helper_ == null) {
       _reconnectStatusController.add('SIP service not initialized');
       return false;
     }
 
-    if (!_connected) {
+    if (!connected_) {
       _reconnectStatusController.add('Not connected to SIP server');
       return false;
     }
 
     try {
-      debugPrint('🔥 DEBUG: makeCall called - target: $target, connected: $_connected');
+      debugPrint('🔥 DEBUG: makeCall called - target: $target, connected: $connected_');
       _reconnectStatusController.add('Initiating call to $target...');
 
       // Enhanced call options for better compatibility
@@ -191,7 +199,7 @@ class SipService extends SipUaHelperListener {
         },
       };
 
-      final success = await _helper!.call(target, voiceOnly: true, customOptions: callOptions);
+      final success = await helperNotifier.call(target, true, callOptions);
 
       if (success) {
         _reconnectStatusController.add('Call initiated to $target');
@@ -245,24 +253,6 @@ class SipService extends SipUaHelperListener {
     call.sendDTMF(tone);
   }
 
-  Future<void> _saveCredentials(
-    String username,
-    String password,
-    String server,
-    String wsUrl,
-    String? displayName,
-  ) async {
-    final settings = SipSettingsModel(
-      username: username,
-      password: password,
-      server: server,
-      wsUrl: wsUrl,
-      displayName: displayName,
-      autoConnect: true,
-    );
-    await StorageService.saveSipSettings(settings);
-  }
-
   Future<Map<String, String?>> getSavedCredentials() async {
     final settings = StorageService.getSipSettings();
     return {
@@ -300,23 +290,21 @@ class SipService extends SipUaHelperListener {
   void registrationStateChanged(RegistrationState state) {
     debugPrint('🔥 DEBUG: registrationStateChanged called - State: ${state.state}');
     _registrationState = state;
-    _connected = state.state == RegistrationStateEnum.REGISTERED;
+    //! _connected = state.state == RegistrationStateEnum.REGISTERED;
     _registrationStateController.add(state);
 
-    if (_connected) {
-      _reconnectStatusController.add('Successfully registered to SIP server');
-      debugPrint('✅ SIP Registration successful');
-    } else {
-      debugPrint('❌ SIP Registration lost - State: ${state.state}');
-    }
+    //! if (_connected) {
+    //   _reconnectStatusController.add('Successfully registered to SIP server');
+    //   debugPrint('✅ SIP Registration successful');
+    // } else {
+    //   debugPrint('❌ SIP Registration lost - State: ${state.state}');
+    // }
 
-    // Handle registration failure
     if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
       log('❌ REGISTRATION FAILED: ${state.cause ?? 'Unknown reason'}');
       _reconnectStatusController.add('Registration failed');
     }
 
-    // Handle disconnection
     if (state.state == RegistrationStateEnum.UNREGISTERED) {
       log('❌ CONNECTION LOST: SIP connection unregistered');
       _reconnectStatusController.add('Connection lost');
@@ -508,4 +496,16 @@ class SipService extends SipUaHelperListener {
     _callStateController.close();
     _reconnectStatusController.close();
   }
+}
+
+Future<void> saveCredentials(String username, String password, String server, String wsUrl, String? displayName) async {
+  final settings = SipSettingsModel(
+    username: username,
+    password: password,
+    server: server,
+    wsUrl: wsUrl,
+    displayName: displayName,
+    autoConnect: true,
+  );
+  await StorageService.saveSipSettings(settings);
 }

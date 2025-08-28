@@ -1,3 +1,5 @@
+import 'dart:developer' show log;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_phone/providers/connection.p.dart';
@@ -83,6 +85,9 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
 
     WebSocketService.setConnectionStatusHandler((bool isConnected) {
       debugPrint('WebSocket connection status changed: $isConnected');
+      if (!isConnected) {
+        print('------ WebSocket server connection disconnected ------');
+      }
     });
 
     // Initialize CallKit listener for iOS call handling
@@ -101,6 +106,7 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
 
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
+    log('didChangeAppLifecycleState ---------$state');
     debugPrint(state.toString());
     if (state == AppLifecycleState.resumed) {
       //Check call when open app from background

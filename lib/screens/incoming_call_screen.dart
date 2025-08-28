@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sip_phone/providers/incoming.p.dart';
 import 'package:sip_ua/sip_ua.dart';
 import '../providers/sip_providers.dart';
+import '../services/call_kit.dart' show stopNotification;
 
 class IncomingCallScreen extends ConsumerStatefulWidget {
   final Call call;
@@ -19,6 +21,7 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen> with Ti
   @override
   void initState() {
     super.initState();
+    stopNotification(widget.call.id ?? '');
     _pulseController = AnimationController(duration: const Duration(seconds: 1), vsync: this);
     _pulseAnimation = Tween<double>(
       begin: 1.0,
@@ -30,20 +33,24 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen> with Ti
   @override
   void dispose() {
     _pulseController.dispose();
+    stopNotification(widget.call.id ?? '');
     super.dispose();
   }
 
-  void _acceptCall() {
-    debugPrint('🔥 DEBUG: User tapped accept button');
-    final sipService = ref.read(sipServiceProvider);
-    sipService.answer(widget.call);
-    debugPrint('🔥 DEBUG: Called sipService.answer(), waiting for call state changes...');
+  Future<void> _acceptCall() async {
+    await answer();
+    await stopNotification(widget.call.id ?? '');
+    // debugPrint('🔥 DEBUG: User tapped accept button');
+    // final sipService = ref.read(sipServiceProvider);
+    // sipService.answer(widget.call);
+    // debugPrint('🔥 DEBUG: Called sipService.answer(), waiting for call state changes...');
   }
 
-  void _declineCall() {
+  Future<void> _declineCall() async {
     final sipService = ref.read(sipServiceProvider);
     sipService.hangup(widget.call);
-    Navigator.pop(context);
+    await stopNotification(widget.call.id ?? '');
+    if (context.mounted) Navigator.pop(context);
   }
 
   @override

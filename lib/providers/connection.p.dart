@@ -152,6 +152,7 @@ class ServerConnection extends _$ServerConnection {
         log('Initializing SIP connection...');
       } catch (startError) {
         log('Failed to start SIP connection: $startError');
+        print('------ Server connection failed to start: $startError ------');
         helperNotifier.set(null);
         return false;
       }
@@ -163,6 +164,7 @@ class ServerConnection extends _$ServerConnection {
       return true;
     } catch (e) {
       log('Connection error: ${e.toString()}');
+      print('------ Server connection error: ${e.toString()} ------');
       helperNotifier.set(null);
       return false;
     }

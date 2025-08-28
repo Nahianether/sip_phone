@@ -302,11 +302,13 @@ class SipService extends SipUaHelperListener {
 
     if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
       log('❌ REGISTRATION FAILED: ${state.cause ?? 'Unknown reason'}');
+      print('------ Server connection lost: Registration failed - ${state.cause ?? 'Unknown reason'} ------');
       _reconnectStatusController.add('Registration failed');
     }
 
     if (state.state == RegistrationStateEnum.UNREGISTERED) {
       log('❌ CONNECTION LOST: SIP connection unregistered');
+      print('------ Server connection lost: SIP unregistered ------');
       _reconnectStatusController.add('Connection lost');
     }
   }
@@ -317,6 +319,7 @@ class SipService extends SipUaHelperListener {
 
     if (state.state == TransportStateEnum.DISCONNECTED) {
       log('❌ TRANSPORT DISCONNECTED: WebSocket transport disconnected');
+      print('------ Server connection lost: Transport disconnected ------');
       _reconnectStatusController.add('Transport disconnected');
     } else if (state.state == TransportStateEnum.CONNECTED) {
       log('✅ TRANSPORT CONNECTED: WebSocket transport connected');
@@ -367,7 +370,6 @@ class SipService extends SipUaHelperListener {
             // Continue with in-app handling even if CallKit fails
           }
 
-          // Always show in-app screen as backup
           _handleIncomingCall(call);
         } else if (call.direction.toLowerCase() == 'incoming' && _handlingIncomingCall) {
           debugPrint('🔥 DEBUG: Already handling incoming call, ignoring duplicate');

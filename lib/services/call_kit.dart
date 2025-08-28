@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/widgets.dart';
@@ -39,7 +38,7 @@ Future<void> showIncomming(String uid, String no) async {
         callbackText: 'Call back',
       ),
       callingNotification: NotificationParams(
-        showNotification: true,
+        showNotification: false,
         isShowCallback: true,
         subtitle: 'Calling... $no',
         callbackText: 'Hang Up',
@@ -110,12 +109,9 @@ void listenCallkit() {
   FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
     if (event == null) return;
     log('CallKit Event: -- ${event.event} - ${event.body}');
-    String? callId;
-    Map<String, dynamic> m_ = jsonDecode(event.body);
-    if (m_.containsKey('id')) {
-      callId = m_['id'];
-      print('---- $callId');
-    }
+    String? callId = event.body['id'] ?? '';
+    callId = callId?.split('@').first;
+    // print('---- $callId');
 
     switch (event.event) {
       case Event.actionCallIncoming:
@@ -126,26 +122,35 @@ void listenCallkit() {
         log('CallKit:-- Started outgoing call');
         break;
       case Event.actionCallAccept:
-        log('CallKit: Accepted incoming call - navigating to in-app call screen');
-        // Navigate to incoming call screen in app when CallKit call is accepted
-        _navigateToIncomingCallScreen(event);
+        log('CallKit: Accepted incoming call -- navigating to in-app call screen');
+
+        await _navigateToIncomingCallScreen(event);
+        await Future.delayed(const Duration(seconds: 3));
+        await answer();
+        await stopNotification(callId ?? '');
 
         break;
       case Event.actionCallDecline:
         await stopNotification(callId ?? '');
-        log('CallKit: Declined incoming call');
+        await FlutterCallkitIncoming.endAllCalls();
+        log('CallKit:--- Declined incoming call');
+        tempCall = null;
         break;
       case Event.actionCallEnded:
-        log('CallKit: Call ended');
+        log('CallKit:--- Call ended');
+        await FlutterCallkitIncoming.endAllCalls();
         await stopNotification(callId ?? '');
+        tempCall = null;
         _navigateToHome();
         break;
       case Event.actionCallTimeout:
         await stopNotification(callId ?? '');
-        log('CallKit: Call timeout');
+        await FlutterCallkitIncoming.endAllCalls();
+        tempCall = null;
+        log('CallKit:-- Call timeout');
         break;
       case Event.actionCallCallback:
-        log('CallKit: Call callback clicked');
+        log('CallKit:-- Call callback clicked');
         break;
       case Event.actionCallToggleHold:
         await stopNotification(callId ?? '');
@@ -170,19 +175,19 @@ void listenCallkit() {
         log('CallKit: Custom action');
         break;
       default:
-        log('CallKit: Unknown event ${event.event}');
+        log('CallKit:------ Unknown event ${event.event}');
     }
   });
 }
 
-void _navigateToIncomingCallScreen(CallEvent event) async {
+Future<void> _navigateToIncomingCallScreen(CallEvent event) async {
   try {
     log('CallKit: Navigating to Flutter incoming call screen');
     final navigationService = NavigationService();
     final context = navigationService.currentContext;
-    
+
     // Ensure app is brought to foreground properly
-      _bringAppToForeground();
+    await _bringAppToForeground();
 
     if (context != null && context.mounted) {
       // Check if tempCall exists and is in a valid state to be answered
@@ -200,12 +205,8 @@ void _navigateToIncomingCallScreen(CallEvent event) async {
       if (callState == CallStateEnum.CALL_INITIATION ||
           callState == CallStateEnum.PROGRESS ||
           callState == CallStateEnum.CONNECTING) {
-        final answerOptions = {
-          'mediaConstraints': {'audio': true, 'video': false},
-        };
-
-        tempCall!.answer(answerOptions);
-        log('CallKit: Call answered successfully');
+        await answer();
+        log('CallKit: ------Call answered successfully');
         // Use NavigationService to properly bring app to foreground
         navigationService.navigateToAndClearStack('/active_call', arguments: tempCall);
       } else if (callState == CallStateEnum.CONFIRMED || callState == CallStateEnum.ACCEPTED) {
@@ -219,10 +220,10 @@ void _navigateToIncomingCallScreen(CallEvent event) async {
 
       log('CallKit: Navigation successful');
     } else {
-      log('CallKit: No context available for navigation');
+      log('CallKit:Context not found ---------- No context available for navigation');
     }
   } catch (e) {
-    log('CallKit: Navigation/Answer error - $e');
+    log('CallKit:----------- Navigation/Answer error - $e');
     // Fallback navigation to home on any error
     try {
       final navigationService = NavigationService();
@@ -255,30 +256,30 @@ Future<void> stopNotification(String id) async {
   await FlutterCallkitIncoming.hideCallkitIncoming(params);
 }
 
-void _bringAppToForeground() async {
+Future<void> _bringAppToForeground() async {
   // This method ensures the app is properly brought to foreground
   // without creating multiple instances
   try {
     log('CallKit: Bringing app to foreground');
-    
+
     // Check current app lifecycle state
     final binding = WidgetsBinding.instance;
     log('CallKit: Current app lifecycle state: ${binding.lifecycleState}');
-    
+
     // If app is in background, it will automatically come to foreground
     // when CallKit triggers the action. We just need to ensure proper
     // navigation state management.
-    
+
     // Wait a moment for the app to initialize if needed
     if (NavigationService.navigatorKey.currentContext == null) {
       log('CallKit: Waiting for app to initialize...');
       await Future.delayed(Duration(milliseconds: 1000));
     }
-    
+
     final context = NavigationService.navigatorKey.currentContext;
     if (context != null && context.mounted) {
       log('CallKit: App is ready for navigation');
-      
+
       // Trigger a frame callback to ensure UI is ready
       WidgetsBinding.instance.addPostFrameCallback((_) {
         log('CallKit: UI frame ready for navigation');
@@ -286,7 +287,6 @@ void _bringAppToForeground() async {
     } else {
       log('CallKit: Warning - Navigation context still not available');
     }
-    
   } catch (e) {
     log('CallKit: Error in foreground management: $e');
   }

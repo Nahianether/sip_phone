@@ -1,5 +1,10 @@
+import 'dart:developer' show log;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sip_phone/providers/connection.p.dart';
+import 'package:sip_phone/providers/incoming.p.dart';
+import 'package:sip_phone/providers/sip_providers.dart';
 import 'package:sip_phone/services/call_kit.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'screens/home_screen.dart';
@@ -25,6 +30,11 @@ class SipPhoneApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(isDarkModeProvider);
+    ref.watch(serverConnectionProvider);
+    ref.watch(sipHelpersProvider);
+
+    // Initialize auto-connect at app level
+    // ref.watch(keepAliveAutoConnectProvider);
 
     return MaterialApp(
       title: 'SIP Phone',
@@ -42,7 +52,7 @@ class SipPhoneApp extends ConsumerWidget {
         },
         '/incoming_call': (context) {
           final call = ModalRoute.of(context)!.settings.arguments as Call;
-          return IncomingCallScreen(call: call);
+          return IncomingCallScreen(call: tempCall ?? call);
         },
       },
     );
@@ -82,29 +92,9 @@ class _PermissionWrapperState extends ConsumerState<PermissionWrapper> with Widg
     // Initialize CallKit listener for iOS call handling
     listenCallkit();
     debugPrint('CallKit listener initialized');
-
-    // Check for stored SIP credentials before attempting auto-connect
-    final storedSettings = StorageService.getSipSettings();
-    if (storedSettings != null &&
-        storedSettings.autoConnect == true &&
-        storedSettings.username?.isNotEmpty == true &&
-        storedSettings.password?.isNotEmpty == true &&
-        storedSettings.server?.isNotEmpty == true &&
-        storedSettings.wsUrl?.isNotEmpty == true) {
-      debugPrint('Auto-connecting with stored credentials...');
-      // Use SipService instead of WebSocketService for proper SIP connection
-      final sipService = SipService();
-      await sipService.connect(
-        username: storedSettings.username!,
-        password: storedSettings.password!,
-        server: storedSettings.server!,
-        wsUrl: storedSettings.wsUrl!,
-        displayName: storedSettings.displayName,
-        saveCredentials: false, // Don't save again
-      );
-    } else {
-      debugPrint('Auto-connect skipped: missing credentials');
-    }
+    await Future.delayed(const Duration(seconds: 2));
+    // final r_ = await ref.read(serverConnectionProvider.notifier).connect_();
+    // ref.read(serverConnectionProvider.notifier).set(r_);
 
     await init_();
   }

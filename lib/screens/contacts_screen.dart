@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:sip_phone/providers/connection.p.dart';
 import '../providers/contacts_providers.dart';
 import '../providers/sip_providers.dart';
 import '../services/permission_service.dart';
@@ -32,7 +33,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
       debugPrint('Checking contacts permission...');
       final hasPermission = await _permissionService.checkContactsPermission(context);
       debugPrint('Contacts permission result: $hasPermission');
-      
+
       if (hasPermission) {
         debugPrint('Loading contacts...');
         ref.invalidate(contactsProvider);
@@ -52,8 +53,8 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
 
   Future<void> _makeCall(ContactModel contact) async {
     final sipService = ref.read(sipServiceProvider);
-    
-    if (!sipService.connected) {
+    final connected_ = await ref.read(serverConnectionProvider.future);
+    if (!connected_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -65,78 +66,58 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
       return;
     }
 
-    // Check microphone permission
     final hasPermission = await _permissionService.checkMicrophonePermission(context);
     if (!hasPermission) return;
 
-    final success = await sipService.makeCall(contact.sanitizedPhone);
+    final success = await sipService.makeCall(contact.sanitizedPhone, ref);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to make call. Please try again.'),
-          backgroundColor: AppTheme.errorColor,
-        ),
+        const SnackBar(content: Text('Failed to make call. Please try again.'), backgroundColor: AppTheme.errorColor),
       );
     }
   }
 
   Widget _buildContactTile(ContactModel contact, int index) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-          child: contact.avatar != null
-              ? Text(
-                  contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                )
-              : Text(
-                  contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-        ),
-        title: Text(
-          contact.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          contact.formattedPhone,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 14,
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              onPressed: () => _makeCall(contact),
-              icon: const Icon(Icons.call),
-              color: AppTheme.callAccept,
-              tooltip: 'Call',
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+              child: contact.avatar != null
+                  ? Text(
+                      contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
+                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                    )
+                  : Text(
+                      contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
+                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+                    ),
             ),
-          ],
-        ),
-        onTap: () => _makeCall(contact),
-      ),
-    ).animate().fadeIn(
-      delay: Duration(milliseconds: index * 50),
-      duration: 300.ms,
-    ).slideX(
-      begin: 0.2,
-      end: 0,
-      duration: 300.ms,
-    );
+            title: Text(
+              contact.name,
+              style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+            ),
+            subtitle: Text(contact.formattedPhone, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () => _makeCall(contact),
+                  icon: const Icon(Icons.call),
+                  color: AppTheme.callAccept,
+                  tooltip: 'Call',
+                ),
+              ],
+            ),
+            onTap: () => _makeCall(contact),
+          ),
+        )
+        .animate()
+        .fadeIn(
+          delay: Duration(milliseconds: index * 50),
+          duration: 300.ms,
+        )
+        .slideX(begin: 0.2, end: 0, duration: 300.ms);
   }
 
   Widget _buildSearchBar() {
@@ -167,27 +148,16 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.contacts_outlined,
-            size: 64,
-            color: AppTheme.textTertiary,
-          ),
+          const Icon(Icons.contacts_outlined, size: 64, color: AppTheme.textTertiary),
           const SizedBox(height: 16),
           const Text(
             'Contacts Permission Required',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
           ),
           const SizedBox(height: 8),
           const Text(
             'Allow access to contacts to make calls',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppTheme.textSecondary,
-            ),
+            style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -226,9 +196,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         ],
       ),
       body: contactsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) {
           if (error.toString().contains('denied')) {
             return _buildPermissionRequest();
@@ -237,27 +205,16 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: AppTheme.errorColor,
-                ),
+                const Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
                 const SizedBox(height: 16),
                 const Text(
                   'Failed to load contacts',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   error.toString(),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ),
+                  style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -277,27 +234,16 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.contact_phone_outlined,
-                    size: 64,
-                    color: AppTheme.textTertiary,
-                  ),
+                  const Icon(Icons.contact_phone_outlined, size: 64, color: AppTheme.textTertiary),
                   const SizedBox(height: 16),
                   const Text(
                     'No Contacts Found',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'Your contact list appears to be empty',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppTheme.textSecondary,
-                    ),
+                    style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
@@ -321,27 +267,16 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 64,
-                              color: AppTheme.textTertiary,
-                            ),
+                            Icon(Icons.search_off, size: 64, color: AppTheme.textTertiary),
                             SizedBox(height: 16),
                             Text(
                               'No contacts found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
-                              ),
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                             ),
                             SizedBox(height: 8),
                             Text(
                               'Try adjusting your search',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.textSecondary,
-                              ),
+                              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                             ),
                           ],
                         ),

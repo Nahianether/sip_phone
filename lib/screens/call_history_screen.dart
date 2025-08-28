@@ -17,8 +17,7 @@ class CallHistoryScreen extends ConsumerStatefulWidget {
   ConsumerState<CallHistoryScreen> createState() => _CallHistoryScreenState();
 }
 
-class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
-    with TickerProviderStateMixin {
+class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   final AppContactsService _contactsService = AppContactsService();
 
@@ -70,13 +69,9 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
   Widget build(BuildContext context) {
     final callHistoryAsync = ref.watch(callHistoryProvider);
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Recent'),
-        elevation: 0,
-        backgroundColor: colorScheme.surface,
-      ),
+      appBar: AppBar(title: Text('Recent'), elevation: 0, backgroundColor: colorScheme.surface),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
@@ -153,9 +148,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
                 const SizedBox(height: 16),
                 Text(
                   'Loading call history...',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -164,32 +157,22 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
             child: Container(
               margin: const EdgeInsets.all(24),
               padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
+              decoration: BoxDecoration(color: colorScheme.errorContainer, borderRadius: BorderRadius.circular(16)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.error_outline_rounded,
-                    size: 48,
-                    color: colorScheme.error,
-                  ),
+                  Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
                   const SizedBox(height: 16),
                   Text(
                     'Failed to load call history',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.onErrorContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: colorScheme.onErrorContainer, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     error.toString(),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onErrorContainer,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onErrorContainer),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -215,25 +198,18 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.history_rounded,
-                        size: 64,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      Icon(Icons.history_rounded, size: 64, color: colorScheme.onSurfaceVariant),
                       const SizedBox(height: 16),
                       Text(
                         'No call history yet',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Your call history will appear here after making or receiving calls',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -259,30 +235,21 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
 
   Widget _buildCallList(List<CallHistoryModel> calls, BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     if (calls.isEmpty) {
       return Center(
         child: Container(
           margin: const EdgeInsets.all(24),
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
+          decoration: BoxDecoration(color: colorScheme.surfaceContainer, borderRadius: BorderRadius.circular(16)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.call_end_rounded,
-                size: 48,
-                color: colorScheme.onSurfaceVariant,
-              ),
+              Icon(Icons.call_end_rounded, size: 48, color: colorScheme.onSurfaceVariant),
               const SizedBox(height: 12),
               Text(
                 'No calls in this category',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -298,17 +265,13 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
         final call = calls[index];
         final contactName = _getContactName(call.phoneNumber);
         final isContact = contactName != call.phoneNumber;
-        
+
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
+              BoxShadow(color: colorScheme.shadow.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
             ],
           ),
           child: Material(
@@ -328,14 +291,10 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
                         color: _getCallColor(call.type, context).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        _getCallIcon(call.type),
-                        color: _getCallColor(call.type, context),
-                        size: 24,
-                      ),
+                      child: Icon(_getCallIcon(call.type), color: _getCallColor(call.type, context), size: 24),
                     ),
                     const SizedBox(width: 16),
-                    
+
                     // Call details
                     Expanded(
                       child: Column(
@@ -352,39 +311,31 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
                             const SizedBox(height: 2),
                             Text(
                               PhoneUtils.formatPhoneNumber(call.phoneNumber),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(
-                                Icons.access_time_rounded,
-                                size: 14,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              Icon(Icons.access_time_rounded, size: 14, color: colorScheme.onSurfaceVariant),
                               const SizedBox(width: 4),
                               Text(
                                 _formatTimestamp(call.timestamp),
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                               if (call.duration > 0) ...[
                                 const SizedBox(width: 12),
-                                Icon(
-                                  Icons.timer_outlined,
-                                  size: 14,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                Icon(Icons.timer_outlined, size: 14, color: colorScheme.onSurfaceVariant),
                                 const SizedBox(width: 4),
                                 Text(
                                   call.formattedDuration,
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ],
@@ -392,7 +343,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
                         ],
                       ),
                     ),
-                    
+
                     // Action buttons
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -403,27 +354,16 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: IconButton(
-                            icon: Icon(
-                              Icons.call_rounded,
-                              color: Colors.green.shade600,
-                              size: 20,
-                            ),
+                            icon: Icon(Icons.call_rounded, color: Colors.green.shade600, size: 20),
                             onPressed: () => _makeCall(call.phoneNumber),
                             tooltip: 'Call',
                           ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
                           child: IconButton(
-                            icon: Icon(
-                              Icons.delete,
-                              color: Colors.white,
-                              size: 20,
-                            ),
+                            icon: Icon(Icons.delete, color: Colors.white, size: 20),
                             onPressed: () async {
                               final confirmed = await _showDeleteDialog(context);
                               if (confirmed) {
@@ -449,7 +389,7 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final diff = now.difference(timestamp);
-    
+
     if (diff.inDays > 7) {
       return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
     } else if (diff.inDays > 0) {
@@ -465,54 +405,41 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen>
 
   Future<void> _makeCall(String phoneNumber) async {
     final sipService = ref.read(sipServiceProvider);
-    await sipService.makeCall(phoneNumber);
+    await sipService.makeCall(phoneNumber, ref);
   }
 
   Future<bool> _showDeleteDialog(BuildContext context) async {
     final colorScheme = Theme.of(context).colorScheme;
-    
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: Icon(
-          Icons.delete_outline_rounded,
-          color: colorScheme.error,
-          size: 32,
-        ),
-        title: Text(
-          'Delete Call',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to delete this call from history?',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
 
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: colorScheme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 32),
+            title: Text(
+              'Delete Call',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
+            ),
+            content: Text(
+              'Are you sure you want to delete this call from history?',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text('Cancel', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 }

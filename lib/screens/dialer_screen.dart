@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../providers/connection.p.dart' show serverConnectionProvider;
 import '../providers/sip_providers.dart';
 import '../data/services/contacts_service.dart';
 import '../data/models/contact_model.dart';
@@ -73,6 +74,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
   Future<void> _makeCall() async {
     final phoneNumber = ref.read(phoneNumberProvider);
     final sipService = ref.read(sipServiceProvider);
+    final connected_ = await ref.read(serverConnectionProvider.future);
 
     if (phoneNumber.isEmpty) return;
 
@@ -91,7 +93,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
     }
 
     // Check connection status
-    if (!sipService.connected) {
+    if (!connected_) {
       _showErrorSnackBar('Not connected to SIP server. Please check settings.');
       return;
     }
@@ -105,7 +107,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
 
     debugPrint('📞 Calling: $phoneNumber -> $sanitizedNumber');
 
-    final success = await sipService.makeCall(sanitizedNumber);
+    final success = await sipService.makeCall(sanitizedNumber, ref);
     if (success) {
       _clearNumber();
     } else {
@@ -128,7 +130,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
   Widget _buildDialpadButton(String number, String letters, double size) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Font sizes based on screen width ratios
     final fontSize = screenWidth * 0.07; // 7% of screen width
     final letterSize = screenWidth * 0.025; // 2.5% of screen width
@@ -340,7 +342,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
                       ],
                     ),
                   ),
-                  if (phoneNumber.isNotEmpty) 
+                  if (phoneNumber.isNotEmpty)
                     Container(
                       margin: EdgeInsets.only(left: 12),
                       decoration: BoxDecoration(
@@ -378,23 +380,20 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
                 builder: (context, constraints) {
                   final screenWidth = MediaQuery.of(context).size.width;
                   final screenHeight = MediaQuery.of(context).size.height;
-                  
+
                   // Calculate available space more carefully
                   final appBarHeight = kToolbarHeight + MediaQuery.of(context).padding.top + 48; // Tab bar height
                   final actionButtonsHeight = screenHeight * 0.12;
                   final phoneFieldHeight = phoneNumber.isNotEmpty ? 80.0 : 60.0; // Dynamic height
-                  final availableHeight = screenHeight - appBarHeight - actionButtonsHeight - phoneFieldHeight - 60; // Extra padding
-                  
+                  final availableHeight =
+                      screenHeight - appBarHeight - actionButtonsHeight - phoneFieldHeight - 60; // Extra padding
+
                   // Use screen ratios but ensure minimum space
                   final dialpadWidth = screenWidth * 0.92;
                   final dialpadHeight = availableHeight.clamp(300.0, availableHeight);
 
                   return Center(
-                    child: SizedBox(
-                      width: dialpadWidth,
-                      height: dialpadHeight,
-                      child: _buildModernDialpad(),
-                    ),
+                    child: SizedBox(width: dialpadWidth, height: dialpadHeight, child: _buildModernDialpad()),
                   );
                 },
               ),
@@ -475,15 +474,19 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = MediaQuery.of(context).size.width;
-        
+
         // Calculate button size based on available space, not just screen width
         final maxButtonSize = constraints.maxHeight / 5; // 4 rows + spacing
         final screenBasedSize = screenWidth * 0.2; // 20% of screen width
-        final buttonSize = [maxButtonSize, screenBasedSize, 75.0].reduce((a, b) => a < b ? a : b).toDouble(); // Take minimum
-        
+        final buttonSize = [
+          maxButtonSize,
+          screenBasedSize,
+          75.0,
+        ].reduce((a, b) => a < b ? a : b).toDouble(); // Take minimum
+
         final horizontalSpacing = (constraints.maxWidth - (buttonSize * 3)) / 4;
         final verticalSpacing = (constraints.maxHeight - (buttonSize * 4)) / 6;
-        
+
         // Ensure spacing is reasonable
         final safeHorizontalSpacing = horizontalSpacing.clamp(8.0, 24.0);
         final safeVerticalSpacing = verticalSpacing.clamp(4.0, 20.0);
@@ -494,10 +497,7 @@ class _DialerScreenState extends ConsumerState<DialerScreen> with TickerProvider
           child: GridView.builder(
             shrinkWrap: true,
             physics: NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(
-              horizontal: safeHorizontalSpacing * 0.6,
-              vertical: safeVerticalSpacing * 0.4,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: safeHorizontalSpacing * 0.6, vertical: safeVerticalSpacing * 0.4),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               childAspectRatio: 1.0,

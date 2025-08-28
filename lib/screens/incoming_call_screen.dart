@@ -12,25 +12,18 @@ class IncomingCallScreen extends ConsumerStatefulWidget {
   ConsumerState<IncomingCallScreen> createState() => _IncomingCallScreenState();
 }
 
-class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
-    with TickerProviderStateMixin {
+class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen> with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 1),
-      vsync: this,
-    );
+    _pulseController = AnimationController(duration: const Duration(seconds: 1), vsync: this);
     _pulseAnimation = Tween<double>(
       begin: 1.0,
       end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
     _pulseController.repeat(reverse: true);
   }
 
@@ -56,7 +49,7 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
   @override
   Widget build(BuildContext context) {
     final remoteIdentity = widget.call.remote_identity?.toString() ?? 'Unknown Caller';
-    
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -65,13 +58,7 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
           child: Column(
             children: [
               const SizedBox(height: 60),
-              const Text(
-                'Incoming Call',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 18,
-                ),
-              ),
+              const Text('Incoming Call', style: TextStyle(color: Colors.white70, fontSize: 18)),
               const SizedBox(height: 40),
               AnimatedBuilder(
                 animation: _pulseAnimation,
@@ -89,21 +76,11 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
               const SizedBox(height: 30),
               Text(
                 remoteIdentity,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Mobile',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
-              ),
+              const Text('Mobile', style: TextStyle(color: Colors.white70, fontSize: 16)),
               const Spacer(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -114,15 +91,8 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
                     child: Container(
                       width: 70,
                       height: 70,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.call_end,
-                        color: Colors.white,
-                        size: 35,
-                      ),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: const Icon(Icons.call_end, color: Colors.white, size: 35),
                     ),
                   ),
                   // Accept Button
@@ -131,15 +101,8 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
                     child: Container(
                       width: 70,
                       height: 70,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.call,
-                        color: Colors.white,
-                        size: 35,
-                      ),
+                      decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                      child: const Icon(Icons.call, color: Colors.white, size: 35),
                     ),
                   ),
                 ],
@@ -152,8 +115,7 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
                     icon: Icons.message,
                     label: 'Message',
                     onPressed: () {
-                      // 
-                      
+                      //
                     },
                   ),
                   _buildActionButton(
@@ -173,11 +135,7 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
+  Widget _buildActionButton({required IconData icon, required String label, required VoidCallback onPressed}) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -186,25 +144,12 @@ class _IncomingCallScreenState extends ConsumerState<IncomingCallScreen>
           child: Container(
             width: 50,
             height: 50,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade800,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 25,
-            ),
+            decoration: BoxDecoration(color: Colors.grey.shade800, shape: BoxShape.circle),
+            child: Icon(icon, color: Colors.white, size: 25),
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-          ),
-        ),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
       ],
     );
   }

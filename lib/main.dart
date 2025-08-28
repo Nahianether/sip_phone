@@ -1,10 +1,7 @@
-import 'dart:developer' show log;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sip_phone/providers/connection.p.dart';
 import 'package:sip_phone/providers/incoming.p.dart';
-import 'package:sip_phone/providers/sip_providers.dart';
 import 'package:sip_phone/services/call_kit.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'screens/home_screen.dart';
@@ -14,7 +11,6 @@ import 'services/navigation_service.dart';
 import 'services/websocket_service.dart';
 import 'services/permission_service.dart';
 import 'services/storage_service.dart';
-import 'services/sip_service.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
 
